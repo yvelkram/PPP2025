@@ -11,4 +11,4 @@ y2 = int(input("y2 : "))
 
 d = math.sqrt(math.pow(x2 - x1, 2) + math.pow(y2 - y1, 2))
 
-print(f"P1({x1, y1}) 과 P2({x2, y2}) 사이의 거리는 {d} 입니다.")
+print(f"두 점, P1({x1, y1}) 과 P2({x2, y2}) 사이의 거리는 {d} 입니다.")

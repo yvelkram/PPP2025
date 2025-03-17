@@ -3,8 +3,8 @@
 
 import math
 
-weight = int(input("몸무게는? : "))
-height = int(input("키는? : "))
+weight = int(input("몸무게는? (kg) : "))
+height = int(input("키는? (cm) : "))
 
 BMI = weight / math.pow(height / 100, 2)
 
