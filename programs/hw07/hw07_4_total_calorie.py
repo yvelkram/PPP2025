@@ -4,8 +4,22 @@
 # 과제 #06-01 활용. 함수명은 total_calorie(fruits, fruits_calorie_dic)
 
 
+def total_calorie(fruits, fruits_calorie_dic):
+    total_gram = 0
+    calorie_sum = 0
+    for name in fruits:
+        total_gram += fruits[name]
+        cal = fruits_calorie_dic[name] * fruits[name] / 100
+        calorie_sum += cal
+        print(f"[{name}] : {fruits[name]}g, {cal:,.1f}kcal")
+
+    print(f"과일을 총 {total_gram:,}g 드셨으며, 칼로리는 총 {calorie_sum:,.1f}kcal 입니다.")
+
+
 def main():
-    pass
+    fruits = {"딸기": 300, "한라봉": 150}
+    fruits_calorie_dic = {"한라봉": 50, "딸기": 34, "바나나": 77}
+    total_calorie(fruits, fruits_calorie_dic)
 
 
 if __name__ == '__main__':

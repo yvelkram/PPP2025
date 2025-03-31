@@ -4,8 +4,20 @@
 # 4로 나누어떨어지더라도, 100으로 나누어 떨어진다면, 윤년 아님.
 
 
+def is_leap_year(y):
+    if y % 4 == 0:
+        if y % 100 == 0:
+            return False
+        return True
+    return False
+
+
 def main():
-    pass
+    a = 2000
+    if is_leap_year(a):
+        print(f"{a}년은 윤년입니다.")
+    else:
+        print(f"{a}년은 윤년이 아닙니다.")
 
 
 if __name__ == '__main__':
