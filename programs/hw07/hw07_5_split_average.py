@@ -7,7 +7,7 @@ import hw07_1_average_by_list
 
 
 def main():
-    a = "1 2 3 4 5"
+    a = "1 2 3 4 5 20 80 9 1"
     mean = hw07_1_average_by_list.average(a.split(" "))
 
     print(f"모든 숫자의 평균은 {mean:0.2f} 입니다.")

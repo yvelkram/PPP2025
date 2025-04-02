@@ -11,6 +11,7 @@ def get_range_list(n):
 
 def main():
     a = get_range_list(10)[:]
+    print("리스트를 출력합니다.")
     print(a)
 
 
