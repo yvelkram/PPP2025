@@ -1,8 +1,9 @@
-
-# // 몫 - % 나머지
-# 타입 : 글자(str) + 숫자 --- 숫자 : 정수(int) + 실수(float)
-# 0xff = 255
-# break, continue
+#수업시간에 같이 한 예제처럼, 숫자가 여러 줄에 걸쳐서 저장되어 있는 경우, 각 숫자를 읽어와서,
+# 1) 총 숫자의 개수,
+# 2) 주어진 숫자의 평균,
+# 3) 주어진 숫자의 최댓값,
+# 4) 주어진 숫자의 최솟값,
+# 5) 중앙값을 출력하시오.
 
 
 def read_text(filename):
@@ -60,12 +61,39 @@ def median(n_list):
         return sorted_list[int(len(sorted_list) / 2)]
 
 
+def maximum(n_list):
+    if len(n_list) == 0:
+        print("empty list input!")
+        return 0
+
+    a = n_list[0]
+    for i in n_list:
+        if a < i:
+            a = i
+    return a
+
+
+
+def minimum(n_list):
+    if len(n_list) == 0:
+        print("empty list input!")
+        return 0
+
+    a = n_list[0]
+    for i in n_list:
+        if a > i:
+            a = i
+    return a
+
+
 def main():
-    nums = text2list(read_text("../data/hw08/numbers1.txt"))
-    print(f"!{nums}!")
-    print("주어진 리스트는", nums)
-    print(f"평균값은 {average(nums):0.1f}")
-    print(f"중앙값은 {median(nums)}")
+    nums = text2list(read_text("../../data/hw08/numbers0.txt"))[:]
+
+    print(f"총 숫자의 개수 : {len(nums)}")
+    print(f"주어진 숫자의 평균 : {average(nums):0.1f}")
+    print(f"주어진 숫자의 최댓값 : {maximum(nums)}")
+    print(f"주어진 숫자의 최솟값 : {minimum(nums)}")
+    print(f"주어진 숫자의 중앙값 : {median(nums)}")
 
 
 if __name__ == '__main__':
