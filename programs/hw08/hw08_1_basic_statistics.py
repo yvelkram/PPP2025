@@ -73,7 +73,6 @@ def maximum(n_list):
     return a
 
 
-
 def minimum(n_list):
     if len(n_list) == 0:
         print("empty list input!")
