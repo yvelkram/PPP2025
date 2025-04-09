@@ -1,72 +1,35 @@
-
 # // 몫 - % 나머지
 # 타입 : 글자(str) + 숫자 --- 숫자 : 정수(int) + 실수(float)
 # 0xff = 255
 # break, continue
 
 
-def read_text(filename):
-    lines = open(filename).readlines()
-    result = ""
-    for ln in lines:
-        ln = ln.replace("\n", " ")
-        result += ln
+def csv_read(filename):
+    lines = open(filename, encoding="UTF-8-sig").readlines()
+
+    result = {}
+    for line in lines[1:]:
+        token = line.replace("\n", "").replace(" ", "").split(",")
+        result[token[0]] = int(token[1]) / int(token[2])
 
     return result
-
-
-def text2list(t):
-    if t == "" or t.strip() == "":
-        print("empty text input!")
-        return []
-
-    result = []
-    for i in t.split(" "):
-        if i == "":
-            continue
-        result.append(int(i))
-
-    if len(result) == 0:
-        print("invalid text input!")
-        return []
-    return result
-
-
-def average(n_list):
-    if len(n_list) == 0:
-        print("empty list input!")
-        return 0
-
-    return sum(n_list) / len(n_list)
-
-
-def median(n_list):
-    if len(n_list) == 0:
-        print("empty list input!")
-        return 0
-    elif len(n_list) <= 1:
-        print("list is too short!")
-        return n_list[0]
-
-    sorted_list = sorted(n_list)
-
-    # 짝수일때 : 가운데 2개 평균
-    if len(sorted_list) % 2 == 0:
-        a = sorted_list[int(len(sorted_list) / 2) - 1]
-        b = sorted_list[int(len(sorted_list) / 2)]
-        return (a + b) / 2
-    # 홀수일때 : 그냥 가운데값
-    else:
-        return sorted_list[int(len(sorted_list) / 2)]
 
 
 def main():
-    nums = text2list(read_text("../data/hw08/numbers1.txt"))
-    print(f"!{nums}!")
-    print("주어진 리스트는", nums)
-    print(f"평균값은 {average(nums):0.1f}")
-    print(f"중앙값은 {median(nums)}")
+    # 0 : 작목 / 1 : 열량(kcal/회) / 2 : 총 내용량(g)
+    fruits = csv_read("../data/hw09/calorie_db.csv")
 
+    fruits_eat = {
+        "바나나" : 100,
+        "살구" : 100,
+        "사과" : 100
+    }
+
+    total_calorie = 0
+    for eat in fruits_eat.keys():
+        total_calorie += fruits[eat] * fruits_eat[eat]
+
+    print(total_calorie)
 
 if __name__ == '__main__':
     main()

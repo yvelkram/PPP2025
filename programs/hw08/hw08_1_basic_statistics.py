@@ -86,7 +86,7 @@ def minimum(n_list):
 
 
 def main():
-    nums = text2list(read_text("../../data/hw08/numbers0.txt"))[:]
+    nums = text2list(read_text("../../data/hw08/numbers0.txt"))
 
     print(f"총 숫자의 개수 : {len(nums)}")
     print(f"주어진 숫자의 평균 : {average(nums):0.1f}")
