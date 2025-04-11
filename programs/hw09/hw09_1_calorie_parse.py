@@ -32,6 +32,7 @@ def main():
         print(f"{eat} : {fruits_eat[eat]}g")
     print(f"총 섭취한 칼로리는 {total_calorie}kcal 입니다.")
 
+
 if __name__ == '__main__':
     main()
 

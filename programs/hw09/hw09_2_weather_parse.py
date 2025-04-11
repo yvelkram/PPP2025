@@ -80,6 +80,7 @@ def count_if(column_numbers, condition, data):
 
     return count
 
+
 def main():
     # 0 : year, 1 : month, 2 : day,
     # 3 : tmax, 4 : tavg, 5 : tmin,
@@ -91,6 +92,7 @@ def main():
     print(f"연 평균 기온(일평균 기온의 연평균) : {statistics(4, weathers)[1]:0.1f}")
     print(f"5mm이상 강우일수 : {count_if(9, 'x >= 5', weathers)}")
     print(f"총 강우량 : {statistics(9, weathers)[0]:0.1f}")
+
 
 if __name__ == '__main__':
     main()
