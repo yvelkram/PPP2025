@@ -127,6 +127,8 @@ def top_n_date(column_numbers, n, data):
     top_list[0][0] = current_max
     top_list[0][1] = date
 
+    # print(top_list)
+
     # 최대값 제외하고 나머지 경우 반복
     for i in range(n - 1):
         try_max = 0
@@ -140,8 +142,11 @@ def top_n_date(column_numbers, n, data):
                     if test_date == t[1]:
                         exist = True
                 if exist:
+                    # print("중복입니다")
                     continue
                 else:
+                    # print("found new biggest value!")
+                    # print(f"try_max : {try_max}, date : {date}")
                     try_max = ln[column_numbers]
                     date = test_date
                     break
@@ -154,6 +159,8 @@ def top_n_date(column_numbers, n, data):
         top_list[i+1][0] = try_max
         top_list[i+1][1] = date
         current_max = try_max
+
+    # print(top_list)
 
     result = []
     for i in top_list:
@@ -189,7 +196,8 @@ def main():
     print(f"1-5) 강우이벤트 중 최대 강수량은 : {max_repeat(9, weathers_2022)[3]}mm")
 
     tops = top_n_date(3, 10, weathers_2022)
-    print(f"1-6) 가장 더운날 top 3 : {tops[0]}, {tops[1]}, {tops[2]}")
+    # print(tops)
+    print(f"1-6) 가장 더운날 top 3 : {tops[0].split('_')[0]}, {tops[1].split('_')[0]}, {tops[2].split('_')[0]}")
 
     print("")
     print(f"2-1) 여름철(6월-8월) 총 강수량은 {sum_if(9,1, [6, 7, 8], weathers_2022):0.1f}mm")
