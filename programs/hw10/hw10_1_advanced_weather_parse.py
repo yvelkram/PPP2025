@@ -23,6 +23,7 @@ def make_float(column_numbers, data):
         for number in column_numbers:
             i[number] = float(i[number])
             data[n] = i[:]
+    return 1
 
 
 def statistics(column_numbers, data):
@@ -38,7 +39,7 @@ def count_if(column_numbers, condition, data):
     command = condition.strip().split(" ")
     if command[0] != "x":
         print("invalid condition format")
-        return
+        return None
 
     if command[1] == "<":
         case = 1
@@ -54,7 +55,7 @@ def count_if(column_numbers, condition, data):
         case = 6
     else:
         print("invalid condition format")
-        return
+        return None
 
     value = int(command[2])
 
