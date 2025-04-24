@@ -87,10 +87,10 @@ def main():
     make_float([3, 4, 5, 6, 7, 8, 9, 10, 11], weathers)
 
     # 1 - 해당기간동안 연도별로 최대일교차가 발생한 일자와 일교차를 표시하시오.
-    print(f"1 - 일교차가 가장 큰 날 | 그날의 일교차")
+    print(f"1 - 최대 일교차 기록일 | 당일 일교차")
     for year_number in range(2001, 2023):
         max_gap_date, max_temp_gap = maximum_temp_gap(year_number, weathers)
-        print(f"    {max_gap_date:<19} | {max_temp_gap:0.1f}'C")
+        print(f"    {max_gap_date:<18} | {max_temp_gap:0.1f}'C")
 
     print("")
     # 2 - 해당기간동안 각 연도별로 5월부터 9월까지 적산온도를 구하시오
