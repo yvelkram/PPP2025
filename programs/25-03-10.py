@@ -2,15 +2,17 @@
 # 타입 : 글자(str) + 숫자 --- 숫자 : 정수(int) + 실수(float)
 # 0xff = 255
 # break, continue
-
-
-def gugudan(dan = 5):
-    for i in range(1, 10):
-        print(f"{dan} * {i} = {dan * i}")
+import requests
 
 
 def main():
-    gugudan()
+    c_url = "https://coopjbnu.kr/function/ajax.get.rest.data.php"
+    data = {"code": "mobile1"}
+
+    with open("../data/cafeteria_menu.html", "w", encoding="UTF-8") as f:
+        resp = requests.post(c_url, data=data)
+        resp.encoding = "UTF-8"
+        f.write(resp.text)
 
 
 if __name__ == '__main__':

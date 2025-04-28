@@ -26,16 +26,23 @@ def make_float(column_numbers, data):
     return 1
 
 
-def statistics(column_numbers, data):
+def statistics(column_numbers, data, years=None):
     total = 0
+    counter = 0
     for ln in data[1:]:
+        # 년도 지정을 했는데, 해당 연도가 아니라면 스킵
+        if years is not None and ln[0] not in years:
+            continue
+
         total += ln[column_numbers]
-    average = total / len(data)
+        counter += 1
+
+    average = total / counter
 
     return total, average
 
 
-def count_if(column_numbers, condition, data):
+def count_if(column_numbers, condition, data, years=None):
     command = condition.strip().split(" ")
     if command[0] != "x":
         print("invalid condition format")
@@ -61,6 +68,10 @@ def count_if(column_numbers, condition, data):
 
     count = 0
     for ln in data[1:]:
+        # 년도 지정을 했는데, 해당 연도가 아니라면 스킵
+        if years is not None and ln[0] not in years:
+            continue
+
         if case == 1 and ln[column_numbers] < value:
             count += 1
         elif case == 2 and ln[column_numbers] <= value:
