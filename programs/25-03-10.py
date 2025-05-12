@@ -5,6 +5,13 @@
 import requests
 
 
+def str2float(text: str, default_value: float = -999) -> float:
+    try:
+        return float(text)
+    except ValueError:
+        return default_value
+
+
 def main():
     c_url = "https://coopjbnu.kr/function/ajax.get.rest.data.php"
     data = {"code": "mobile1"}
