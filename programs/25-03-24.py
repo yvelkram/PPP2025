@@ -1,22 +1,24 @@
 
-def add(n_list):
-    n_list.append(10)
-    return n_list
+chosung_list = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+
+
+def print_code(ch):
+    print(f"{ch} => {ord(ch)}")
+
+
+def print_char(code):
+    print(f"{code} => {chr(code)}")
+
+
+def chosunglize(word: str) -> str:
+    result = ""
+    for i in word:
+        result += str(chosung_list[(ord(i) - 44032) // 588])
+    return result
 
 
 def main():
-    a = [1, 2, 3, 4, 5]
-    b = add(a)[:]
-    c = add(b)[:]
-    d = add(c)[:]
-
-    e = a[:]
-
-    print(id(a))
-    print(id(b))
-    print(id(c))
-    print(id(d))
-    print(id(e))
+    print(chosunglize("가나다라마바사아자차카타파하"))
 
 
 if __name__ == '__main__':
