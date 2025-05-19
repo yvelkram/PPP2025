@@ -2,16 +2,50 @@
 과제용 / For assignment upload
 
 * hw02
+  * hw02_1_c2f.py
+  * hw02_2_bmi.py
+  * hw02_3_circle_area.py
+  * hw02_4_ladder_square.py
+  * hw02_5_discount.py
 * hw03
+  * hw03_1_new_c2f.py
+  * hw03_2_new_bmi.py
+  * hw03_3_new_circle_area.py
+  * hw03_4_new_ladder_square.py
+  * hw03_5_cal_calc.py
+  * hw03_6_two_dot_distance.py
 * hw04
+  * hw04_1_detail_bmi.py
+  * hw04_2_dot_location.py
+  * hw04_3_dict_cal_calc.py
+  * hw04_4_detail_circle_area.py
 * hw05
+  * hw05_1_times_table.py
+  * hw05_2_star_triangle.py
+  * hw05_3_for_cal_calc.py
+  * hw05_4_angle_function.py
 * hw06
+  * hw06_1_func_calc_cal.py
+  * hw06_2_func_gugudan.py
+  * hw06_3_func_c2f.py
+  * hw06_4_func_sum_n.py
 * hw07
+  * hw07_1_average_by_list.py
+  * hw07_2_get_range_list.py
+  * hw07_3_leap_year.py
+  * hw07_4_total_calorie.py
+  * hw07_5_split_average.py
 * hw08
+  * hw08_1_basic_statistics.py
 * hw09
+  * hw09_1_calorie_parse.py
+  * hw09_2_weather_parse.py
 * hw10
+  * hw10_1_advanced_weather_parse.py
 * hw11
+  * hw11_1_gdd.py
 * hw12
+  * hw12_1_automatic_weather_parse.py
 * hw13
   * x
 * hw14
@@ -20,3 +54,10 @@
   * hw15_1_toggletext.py
   * hw15_2_caesar_code.py
   * hw15_3_chosung_game.py
+* hw16
+  * hw16_1_countDown.py
+  * hw16_2_gugudanExam.py
+  * hw16_3_hangman.py
+  * hw16_4_645.py
+  * hw16_5_weatherA.py
+  * hw16_6_weatherB.py
