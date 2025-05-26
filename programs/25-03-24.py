@@ -4,7 +4,6 @@ import tkinter.simpledialog
 import rich
 
 
-
 window = tkinter.Tk()
 window.withdraw()
 

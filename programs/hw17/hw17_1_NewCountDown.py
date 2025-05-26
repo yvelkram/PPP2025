@@ -1,25 +1,31 @@
-
-
+import tkinter
+from tkinter import simpledialog
 import time
 
 
-def count_down(second: int) -> None:
-    while 1:
+def count_down(second: int, label: tkinter.Label, window: tkinter.Tk) -> None:
+    def update():
+        nonlocal second
         if second < 0:
-            break
-
-        print(f"{second}초...", end="\r")
-        time.sleep(1)
-
-        second -= 1
-
-    print(" vvvvvv")
-    print("> BOOM <")
-    print(" ^^^^^^")
+            label.config(text=" vvvvvv\n"+"> BOOM <\n"+" ^^^^^^")
+        else:
+            label.config(text=f"{second}초...")
+            window.after(1000, update)
+            second -= 1
+    update()
 
 
 def main() -> None:
-    count_down(5)
+    main_window = tkinter.Tk()
+    main_window.title("Count Down")
+
+    second = simpledialog.askinteger("input", "초를 입력하세요")
+
+    label = tkinter.Label(main_window, text="", font=("Arial", 24), width=20, height=5)
+    label.pack(padx=20, pady=20)
+
+    count_down(second, label, main_window)
+    main_window.mainloop()
 
 
 if __name__ == '__main__':

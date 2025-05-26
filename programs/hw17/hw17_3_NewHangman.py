@@ -1,8 +1,11 @@
+import tkinter
+from tkinter import simpledialog
+from tkinter import messagebox
 import random
-import hw17_1_NewCountDown
 
 
 game_words = "apple, banana, grape, mango, strawberry, eggplant, potato, watermelon, melon, egg"
+title = "Hangman Game"
 
 
 def setup(words: str) -> list[str]:
@@ -19,51 +22,60 @@ def setup(words: str) -> list[str]:
     return result
 
 
-def print_words(data: list, lives: int) -> None:
-    print(f"LIVE {lives}", end="")
-    print(" "*5, end="")
+def print_words(data: list, lives: int) -> str:
+    s = ""
+
+    s += f"LIVE {lives}"
+    s += " "*5
+
     for token in data:
-        print(" ", end="")
+        s += " "
         if token[0] == 0:
-            print(token[1], end="")
+            s += str(token[1])
         else:
-            print("_", end="")
-    print("\n")
+            s += "_"
+    s += "\n"
+
+    return s
 
 
-def print_hangman(lives: int) -> None:
+def print_hangman(lives: int, offset=15) -> str:
+    s = ""
     match lives:
         case 0:
-            print(" " * 15 + " \\ o /\n",
-                  " " * 15 + " \\|/\n",
-                  " " * 15 + "  |\n",
-                  " " * 15 + " / \\\n",
-                  " " * 15 + "/   \\\n")
+            s += " " * offset + "\\ o /\n"
+            s += " " * offset + " \\|/\n"
+            s += " " * offset + "  |\n"
+            s += " " * offset + " / \\\n"
+            s += " " * offset + "/   \\\n"
         case 1:
-            print(" " * 15 + " \\ o /\n",
-                  " " * 15 + " \\|/\n",
-                  " " * 15 + "  |\n",
-                  " " * 15 + " /\n",
-                  " " * 15 + "/\n")
+            s += " " * offset + "\\ o /\n"
+            s += " " * offset + " \\|/\n"
+            s += " " * offset + "  |\n"
+            s += " " * offset + " /\n"
+            s += " " * offset + "/\n"
         case 2:
-            print(" " * 15 + " \\ o /\n",
-                  " " * 15 + " \\|/\n",
-                  " " * 15 + "  |\n\n\n")
+            s += " " * offset + "\\ o /\n"
+            s += " " * offset + " \\|/\n"
+            s += " " * offset + "  |\n\n\n"
         case 3:
-            print(" " * 15 + " \\ o /\n",
-                  " " * 15 + " \\|/\n\n\n\n",)
+            s += " " * offset + "\\ o /\n"
+            s += " " * offset + " \\|/\n\n\n\n"
         case 4:
-            print(" " * 15 + " \\ o\n",
-                  " " * 15 + " \\|\n\n\n\n",)
+            s += " " * offset + "\\ o\n"
+            s += " " * offset + " \\|\n\n\n\n"
         case 5:
-            print(" " * 15 + "   o\n",
-                  " " * 15 + "  |\n\n\n\n", )
+            s += " " * offset + "   o\n"
+            s += " " * offset + "  |\n\n\n\n"
         case _:
-            print(" " * 15 + "   o\n\n\n\n\n\n")
+            s += " " * offset + "   o\n\n\n\n\n\n"
+
+    return s
 
 
-def check_trial(data: list) -> bool:
-    trial = input(" > ")[0]
+def check_trial(data: list, lives: int) -> bool:
+    trial = simpledialog.askstring(title=title,
+                                   prompt=print_hangman(lives) + print_words(data, lives))
 
     answer = []
     for n, i in enumerate(data):
@@ -98,25 +110,23 @@ def game(words: list[str]) -> bool:
         data.append([1, i])
 
     while 1:
-        print_hangman(lives)
-        print_words(data, lives)
-
         if lives <= 0:
-            print("정답을 맞추지 못했습니다!")
+            messagebox.showinfo(title=title,
+                                message="정답을 맞추지 못했습니다!\n" + print_hangman(lives) + print_words(data, lives))
             return False
 
-        if not check_trial(data):
+        if not check_trial(data, lives):
             lives -= 1
 
         if check_game_end(data):
-            print_words(data, lives)
+            messagebox.showinfo(title=title,
+                                message=print_hangman(lives) + print_words(data, lives))
             return True
 
 
 def main() -> None:
     words = setup(game_words)
     game(words)
-
 
 
 if __name__ == '__main__':
