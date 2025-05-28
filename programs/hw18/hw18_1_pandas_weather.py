@@ -17,29 +17,6 @@ affiliation = ""  # 학과
 student_id = ""    # 학번
 
 
-def find_max_different(column_a: int, column_b: int, data: list[list], years: list[int] = None) -> int or float:
-    """
-    두개의 열의 차이가 가장 큰 값을 내보냄, 절댓값으로 크기비교
-
-    :param column_b: 탐색 열, 순서무관
-    :param column_a: 탐색 열
-    :param years: 탐색 년도, 기본값은 전체조사
-    :param data: 데이터 리스트
-    :return: 최대값
-    """
-    trial = abs(data[1][column_a] - data[1][column_b])
-
-    for ln in data[1:]:
-        # 년도 지정을 했는데, 해당 연도가 아니라면 스킵
-        if years is not None and int(ln[0]) not in years:
-            continue
-
-        if abs(ln[column_a] - ln[column_b]) > trial:
-            trial = abs(ln[column_a] - ln[column_b])
-
-    return trial
-
-
 def download_file(url: str, filepath: str) -> None:
     """
     링크에 접속하여 지정된 경로에 파일 다운로드, 이미 존재하면 다시 다운로드 하지 않음
@@ -130,7 +107,7 @@ def main():
     print(f"> {answer_4}mm")
 
     # submit_assignment(1, 2, 3, 4)
-    submit_assignment(answer_1, answer_2, answer_3, answer_4)
+    # submit_assignment(answer_1, answer_2, answer_3, answer_4)
 
 
 if __name__ == '__main__':
