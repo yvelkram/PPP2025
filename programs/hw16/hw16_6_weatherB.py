@@ -166,14 +166,14 @@ def submit_assignment(a1, a2, a3, a4) -> None:
 
 
 def main():
-    j_weather_path = '../../data/hw16/weather_146_2015-2024.csv'
-    s_weather_path = '../../data/hw16/weather_119_2015-2024.csv'
+    j_weather_path = '../../data/hw16/weather_146_2010-2024.csv'
+    s_weather_path = '../../data/hw16/weather_119_2010-2024.csv'
 
     print("")
     print("0-1) 전주 측정소 주소 저장과정 시작")
-    download_weather(146, 2015, 2024, j_weather_path)
+    download_weather(146, 2010, 2024, j_weather_path)
     print("0-2) 수원 측정소 주소 저장과정 시작")
-    download_weather(119, 2015, 2024, s_weather_path)
+    download_weather(119, 2010, 2024, s_weather_path)
 
     print("0-3) 데이터 변형")
     j_weathers = csv_read(j_weather_path)
@@ -185,29 +185,29 @@ def main():
 
     print("")
     print("1) 전주시의 2015년 연 강수량")
-    answer_1 = f"{statistics(9, j_weathers, [2015])[0]:0.1f}"
+    answer_1 = f"{statistics(9, j_weathers, [2012])[0]:0.1f}"
     print(f"> {answer_1}mm")
 
     print("")
     print("2) 전주시의 2022년 최고기온")
-    answer_2 = find_max(4, j_weathers, [2022])
+    answer_2 = find_max(4, j_weathers, [2024])
     print(f"> {answer_2}'C")
 
     print("")
     print("3) 전주시의 2024년 최대일교차")
-    answer_3 = find_max_different(3, 5, j_weathers, [2024])
+    answer_3 = find_max_different(3, 5, j_weathers, [2020])
     print(f"> {answer_3}'C")
 
     print("")
     print("4) 전주시와 수원시의 2024년 총강수량 차이")
-    n1 = statistics(9, j_weathers, [2024])[0]
-    n2 = statistics(9, s_weathers, [2024])[0]
+    n1 = statistics(9, j_weathers, [2019])[0]
+    n2 = statistics(9, s_weathers, [2019])[0]
 
     answer_4 = f"{abs(n1 - n2):0.1f}"
     print(f"> {answer_4}mm")
 
     # submit_assignment(1, 2, 3, 4)
-    submit_assignment(answer_1, answer_2, answer_3, answer_4)
+    # submit_assignment(answer_1, answer_2, answer_3, answer_4)
 
 
 if __name__ == '__main__':
