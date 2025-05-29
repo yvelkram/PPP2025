@@ -90,12 +90,12 @@ def main():
     print(f"> {answer_2}'C")
 
     print("")
-    print("3) 전주시의 2024년 최대일교차")
+    print("3) 전주시의 2020년 최대일교차")
     different_df = pd.DataFrame()
     different_df['year'] = df_j_weather['year']
     different_df['delta_t'] = abs(df_j_weather['tmax'] - df_j_weather['tmin'])
 
-    answer_3 = f"{different_df[different_df['year'] == 2024]['delta_t'].max():0.1f}"
+    answer_3 = f"{different_df[different_df['year'] == 2020]['delta_t'].max():0.1f}"
     print(f"> {answer_3}'C")
 
     print("")
@@ -106,8 +106,7 @@ def main():
     answer_4 = f"{abs(n1 - n2):0.1f}"
     print(f"> {answer_4}mm")
 
-    # submit_assignment(1, 2, 3, 4)
-    # submit_assignment(answer_1, answer_2, answer_3, answer_4)
+    submit_assignment(answer_1, answer_2, answer_3, answer_4)
 
 
 if __name__ == '__main__':
