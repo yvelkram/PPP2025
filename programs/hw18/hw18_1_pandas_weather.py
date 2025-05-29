@@ -4,8 +4,6 @@
 # 4) 수원시(119)와 전주시(146)의 2019년 총강수량 차이는(절대값)?
 # * 소숫점 첫째자리에서 반올림 할것 *
 
-# [프원실] 과제18_pandas_20249999_홍길동
-
 import programs.hw16.hw16_5_weatherA as hw16
 import os
 import requests
