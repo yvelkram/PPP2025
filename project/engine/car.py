@@ -1,15 +1,13 @@
 import pygame
-import math
-
 from .color import Color
-from .point import Point, TrafficLightColor
+from .point import Point, TrafficLightColor, Path
 
 
 # 차량 클래스
 class Car:
-    def __init__(self, init_pos: Point, path: list[Point], speed=2):
-        self.path = path        # 경로 목록
-        self.current_index = 0  # 다음 경로 지점 색인번호
+    def __init__(self, init_pos: Point, path: Path, speed=2):
+        self.path = path.get_nodes() # 경로 목록
+        self.current_index = 0       # 다음 경로 지점 색인번호
         self.width = 40
         self.height = 20
 
@@ -21,13 +19,13 @@ class Car:
         self.stopped = False  # 정지여부
 
     def debug(self, debug_string):
-        debug_string.append(f"car stopped : {self.stopped}")
-        debug_string.append(f"car pos        : {self.current_pos.debug_get_pos()}")
-        debug_string.append(f"car direction  : {self.direction}")
+        debug_string.append(f"stop  : {self.stopped}")
+        debug_string.append(f"pos   : {self.current_pos.debug_get_pos()}")
+        debug_string.append(f"angle : {self.direction}")
 
         if not self.current_index >= len(self.path):
             debug_string.append(
-                f"car next point : [{self.current_index}] : {self.path[self.current_index].debug_get_pos()}")
+                f"next pnt : [{self.current_index}] : {self.path[self.current_index].debug_get_pos()}")
 
 
     def get_pos(self):
@@ -44,20 +42,15 @@ class Car:
         if self.direction == pygame.Vector2(0.0, 0.0):
             return
 
-        # 단위 방향 벡터와 수직 벡터
-        dir_vec = self.direction.normalize()
-        perp_vec = pygame.Vector2(-dir_vec.y, dir_vec.x)
+        perp_vec = pygame.Vector2(-self.direction .y, self.direction .x)
 
-        # 중심 좌표 기준으로 각 꼭짓점 계산
-        front_right = self.current_pos.get_vector() + dir_vec * (self.width / 2) + perp_vec * (self.height / 2)
-        front_left = self.current_pos.get_vector() + dir_vec * (self.width / 2) - perp_vec * (self.height / 2)
-        back_right = self.current_pos.get_vector() - dir_vec * (self.width / 2) + perp_vec * (self.height / 2)
-        back_left = self.current_pos.get_vector() - dir_vec * (self.width / 2) - perp_vec * (self.height / 2)
+        # 차량 도형 좌표 확인
+        front_right = self.current_pos.get_vector() + self.direction * (self.width / 2) + perp_vec * (self.height / 2)
+        front_left = self.current_pos.get_vector() + self.direction * (self.width / 2) - perp_vec * (self.height / 2)
+        back_right = self.current_pos.get_vector() - self.direction * (self.width / 2) + perp_vec * (self.height / 2)
+        back_left = self.current_pos.get_vector() - self.direction * (self.width / 2) - perp_vec * (self.height / 2)
 
-        # 점 목록으로 폴리곤 그리기
-        pygame.draw.polygon(screen, Color.BLUE, [
-            front_left, front_right, back_right, back_left
-        ])
+        pygame.draw.polygon(screen, Color.BLUE, [front_left, front_right, back_right, back_left])
 
 
     def update(self):

@@ -59,3 +59,28 @@ class Point:
             self.light = TrafficLightColor.green
         else:
             self.light = TrafficLightColor.red
+
+
+class Link:
+    def __init__(self, pos1: Point, pos2: Point):
+        self.pos1 = pos1
+        self.pos2 = pos2
+
+    def get_points(self) -> tuple[Point, Point]:
+        return self.pos1, self.pos2
+
+
+class Path:
+    def __init__(self):
+        self.links = []
+
+    def add_link(self, point: Link):
+        self.links.append(point)
+
+    def get_nodes(self) -> list[Point]:
+        points = [self.links[0].pos1, self.links[0].pos2]
+        for link in self.links[1:]:
+            points.append(link.pos2)
+
+        return points
+
