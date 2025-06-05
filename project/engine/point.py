@@ -11,11 +11,12 @@ class TrafficLightColor:
 
 
 class Point:
-    def __init__(self, x=0.0, y=0.0, is_juction=False):
+    def __init__(self, x=0.0, y=0.0, is_juction=False, is_spawn=False):
         self.x = x
         self.y = y
         self.is_juction = is_juction
-        self.rect = pygame.Rect(self.x, self.y, 80, 80)
+        self.is_spawn = is_spawn
+        self.rect = pygame.Rect(self.x - 40, self.y - 40, 80, 80)
         self.light = TrafficLightColor.red
 
     def get_pos(self) -> tuple:
@@ -66,8 +67,14 @@ class Link:
         self.pos1 = pos1
         self.pos2 = pos2
 
-    def get_points(self) -> tuple[Point, Point]:
-        return self.pos1, self.pos2
+    def get_start_pos(self) -> tuple:
+        return self.pos1.get_pos()
+
+    def get_end_pos(self) -> tuple:
+        return self.pos2.get_pos()
+
+    def get_points(self) -> tuple[tuple, tuple]:
+        return self.pos1.get_pos(), self.pos2.get_pos()
 
 
 class Path:

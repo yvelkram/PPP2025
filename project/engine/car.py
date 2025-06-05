@@ -6,17 +6,18 @@ from .point import Point, TrafficLightColor, Path
 # 차량 클래스
 class Car:
     def __init__(self, init_pos: Point, path: Path, speed=2):
-        self.path = path.get_nodes() # 경로 목록
-        self.current_index = 0       # 다음 경로 지점 색인번호
-        self.width = 40
-        self.height = 20
+        self.path = path.get_nodes()  # 경로 목록
+        self.current_index = 0        # 다음 경로 지점 색인번호
+        self.width = 40   # 차 길이
+        self.height = 20  # 차 너비
 
-        self.speed = speed  # 차량 속도
-        self.current_pos = init_pos
+        self.speed = speed           # 차량 속도
+        self.current_pos = init_pos  # 시작 위치
 
         self.direction = pygame.Vector2(0.0, 0.0)  # 차량의 방향
         self.update_direction()  # 회전방향 초기화
-        self.stopped = False  # 정지여부
+        self.stopped = False   # 정지여부
+        self.disabled = False  # 활성화 여부
 
     def debug(self, debug_string):
         debug_string.append(f"stop  : {self.stopped}")
@@ -26,7 +27,6 @@ class Car:
         if not self.current_index >= len(self.path):
             debug_string.append(
                 f"next pnt : [{self.current_index}] : {self.path[self.current_index].debug_get_pos()}")
-
 
     def get_pos(self):
         return self.current_pos.get_pos()
@@ -52,11 +52,11 @@ class Car:
 
         pygame.draw.polygon(screen, Color.BLUE, [front_left, front_right, back_right, back_left])
 
-
     def update(self):
         # 차량이 모든 경로를 주행하여 종료됨
         if self.current_index >= len(self.path):
             self.stopped = True
+            self.disabled = True
             return
 
         # 신호등 검사
