@@ -11,7 +11,7 @@ class TrafficLightColor:
 
 
 class Point:
-    def __init__(self, x=0, y=0, is_juction=False):
+    def __init__(self, x=0.0, y=0.0, is_juction=False):
         self.x = x
         self.y = y
         self.is_juction = is_juction
