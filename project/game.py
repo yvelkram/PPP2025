@@ -24,6 +24,7 @@ class Game:
         ]
 
         self.cars: list[Car] = []
+        self.car_num = 0
 
     def main_loop(self, debug_string):
         debug_string.clear()
@@ -34,7 +35,7 @@ class Game:
             if event.type == pygame.QUIT:
                 return True
             # 신호등 클릭여부 검사
-            elif event.type == pygame.MOUSEBUTTONUP:
+            if event.type == pygame.MOUSEBUTTONUP:
                 for _, point in self.points.items():
                     if point.is_juction and point.rect.collidepoint(event.pos):
                         point.toggle()
@@ -42,7 +43,8 @@ class Game:
         # --- 로직 파트 ------------------------------------------------------------------------------------------------
         if random.random() < 0.01:
             spawn_x, spawn_y, path_id = random.choice(self.spawn_options)
-            self.cars.append(Car(Point(spawn_x, spawn_y), self.map_data.paths[path_id]))
+            self.cars.append(Car(self.car_num, Point(spawn_x, spawn_y), self.map_data.paths[path_id]))
+            self.car_num += 1
 
         # --- 그리기 파트 ----------------------------------------------------------------------------------------------
         # 도로 그리기
@@ -61,10 +63,10 @@ class Game:
         for n, vehicle in enumerate(self.cars):
             if vehicle.disabled:
                 self.cars.pop(n)
-            vehicle.update()
+            vehicle.update(self.cars)
             vehicle.draw(self.screen)
-            debug_string.append(f"car {n}")
             vehicle.debug(debug_string)
+            # vehicle.debug_draw_sensor(self.screen)
 
         # 디버깅용 텍스트 출력
         y_offset = 10

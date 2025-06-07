@@ -91,3 +91,14 @@ class Path:
 
         return points
 
+
+def point_in_polygon(point: pygame.Vector2, shape: list[pygame.Vector2]) -> bool:
+    right = max(shape[0].x, shape[1].x, shape[2].x, shape[3].x)
+    left = min(shape[0].x, shape[1].x, shape[2].x, shape[3].x)
+    top = min(shape[0].y, shape[1].y, shape[2].y, shape[3].y)
+    down = max(shape[0].y, shape[1].y, shape[2].y, shape[3].y)
+
+    if left <= point.x <= right and top <= point.y <= down:
+        return True
+    else:
+        return False
