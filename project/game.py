@@ -2,9 +2,9 @@ import pygame
 import random
 from engine import *
 
-"""
-todo : 틱 스피드 건드는 스크롤 바 추가
-"""
+
+# Todo : 기능추가 - 틱 스피드 건드는 스크롤 바 추가
+# Todo : 버그 - 차량 교차로에서 스틸메이트 현상 존재함.
 
 
 class Game:
