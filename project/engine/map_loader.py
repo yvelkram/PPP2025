@@ -4,12 +4,17 @@ from .point import Point, Link, Path
 
 @dataclass
 class MapData:
-    nodes: dict[int, Point]
-    links: dict[int, Link]
-    paths: dict[int, Path]
+    nodes: dict[int, Point]  # 노드 리스트 (신호등, 스폰점 포함)
+    links: dict[int, Link]   # 링크 리스트
+    paths: dict[int, Path]   # 경로 리스트
 
 
 def load_map(file_path) -> MapData:
+    """
+    맵 데이터 불러와서 파싱하는 함수
+    :param file_path: 파일 경로
+    :return: 노드, 링크, 경로가 구조화된 딕셔너리 데이터
+    """
     nodes: dict[int, Point] = {}
     links: dict[int, Link] = {}
     paths: dict[int, Path] = {}
@@ -42,13 +47,19 @@ def load_map(file_path) -> MapData:
                 for link_id in link_ids.split(','):
                     paths[int(path_id)].add_link(links[int(link_id)])
 
-            else:
+            else:  # 아무것도 아닌 줄
                 continue
 
     return MapData(nodes=nodes, links=links, paths=paths)
 
 
 def get_spawn_point(paths: dict[int, Path]) -> list[tuple[int, int, int]]:
+    """
+    스폰지점으로 설정된 점만 따로 추출해서 내보내줌
+    :param paths: 전체 경로 데이터
+    :return: (좌표, 좌표, 경로번호)
+    """
+
     spawn_point = []
     for n, path in paths.items():
         for point in path.get_nodes():

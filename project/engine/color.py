@@ -3,6 +3,9 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Color:
+    """
+    색 라이브러리
+    """
     WHITE = (255, 255, 255)
     LIGHT_GRAY = (220, 220, 220)
     GRAY = (200, 200, 200)
