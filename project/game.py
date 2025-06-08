@@ -2,6 +2,10 @@ import pygame
 import random
 from engine import *
 
+"""
+todo : 틱 스피드 건드는 스크롤 바 추가
+"""
+
 
 class Game:
     def __init__(self):
@@ -16,12 +20,8 @@ class Game:
         self.font = pygame.font.SysFont("D2Coding", 15)
 
         # 데이터 호출
-        self.map_data = load_map("./map/map1.dat")
-        self.points = self.map_data.nodes
-        self.spawn_options = [
-            (-150, 500, 1),
-            (500, -150, 2),
-        ]
+        self.map_data = load_map("./map/map2.dat")
+        self.spawn_options = get_spawn_point(self.map_data.paths)
 
         self.cars: list[Car] = []
         self.car_num = 0
@@ -36,15 +36,19 @@ class Game:
                 return True
             # 신호등 클릭여부 검사
             if event.type == pygame.MOUSEBUTTONUP:
-                for _, point in self.points.items():
+                for _, point in self.map_data.nodes.items():
                     if point.is_juction and point.rect.collidepoint(event.pos):
                         point.toggle()
 
         # --- 로직 파트 ------------------------------------------------------------------------------------------------
-        if random.random() < 0.01:
+        # 차량 스폰 (랜덤 확률)
+        if random.random() < 0.1:
             spawn_x, spawn_y, path_id = random.choice(self.spawn_options)
             self.cars.append(Car(self.car_num, Point(spawn_x, spawn_y), self.map_data.paths[path_id]))
             self.car_num += 1
+
+        for _, point in self.map_data.nodes.items():
+            point.update()
 
         # --- 그리기 파트 ----------------------------------------------------------------------------------------------
         # 도로 그리기
@@ -55,18 +59,18 @@ class Game:
                              link.get_end_pos(),
                              30)
 
-        # 신호등 그리기
-        for _, point in self.points.items():
-            point.draw(self.screen)
-
         # 차량 업데이트 및 그리기
         for n, vehicle in enumerate(self.cars):
-            if vehicle.disabled:
+            if vehicle.disabled:  # 차가 비활성화 되면 제거
                 self.cars.pop(n)
-            vehicle.update(self.cars)
+            vehicle.update(self.cars)  # 차량 업데이트
             vehicle.draw(self.screen)
-            vehicle.debug(debug_string)
+            # vehicle.debug(debug_string)
             # vehicle.debug_draw_sensor(self.screen)
+
+        # 신호등 그리기
+        for _, point in self.map_data.nodes.items():
+            point.draw(self.screen)
 
         # 디버깅용 텍스트 출력
         y_offset = 10

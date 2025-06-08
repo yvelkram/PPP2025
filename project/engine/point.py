@@ -12,11 +12,16 @@ class TrafficLightColor:
 
 class Point:
     def __init__(self, x=0.0, y=0.0, is_juction=False, is_spawn=False):
+        # 점 속성
         self.x = x
         self.y = y
-        self.is_juction = is_juction
-        self.is_spawn = is_spawn
-        self.rect = pygame.Rect(self.x - 40, self.y - 40, 80, 80)
+        self.is_juction = is_juction  # 신호등 여부
+        self.is_spawn = is_spawn      # 스폰지점 여부
+        self.radius = 15
+        self.rect = pygame.Rect(self.x - self.radius / 2, self.y - self.radius / 2, self.radius, self.radius)
+
+        # 점 변수
+        self.timer = 0
         self.light = TrafficLightColor.red
 
     def get_pos(self) -> tuple:
@@ -49,17 +54,30 @@ class Point:
         pygame.draw.rect(screen, Color.LIGHT_GRAY, self.rect, 2)
         pygame.draw.rect(screen, Color.GRAY, self.rect)
         if self.light == TrafficLightColor.red:
-            pygame.draw.circle(screen, Color.RED, self.rect.center, 20)
+            pygame.draw.circle(screen, Color.RED, self.rect.center, 5)
         elif self.light == TrafficLightColor.yellow:
-            pygame.draw.circle(screen, Color.YELLOW, self.rect.center, 20)
+            pygame.draw.circle(screen, Color.YELLOW, self.rect.center, 5)
         elif self.light == TrafficLightColor.green:
-            pygame.draw.circle(screen, Color.GREEN, self.rect.center, 20)
+            pygame.draw.circle(screen, Color.GREEN, self.rect.center, 5)
 
     def toggle(self):
-        if self.light == TrafficLightColor.red:
-            self.light = TrafficLightColor.green
-        else:
-            self.light = TrafficLightColor.red
+        match self.light:
+            case TrafficLightColor.red:
+                self.light = TrafficLightColor.green
+            case TrafficLightColor.yellow:
+                self.light = TrafficLightColor.red
+            case TrafficLightColor.green:
+                self.light = TrafficLightColor.yellow
+            case _:
+                self.light = TrafficLightColor.red
+
+    def update(self):
+        if self.timer > 60:
+            self.toggle()
+            self.timer = 0
+
+        if self.light == TrafficLightColor.yellow:
+            self.timer += 1
 
 
 class Link:

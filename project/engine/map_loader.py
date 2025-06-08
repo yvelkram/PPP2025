@@ -46,3 +46,13 @@ def load_map(file_path) -> MapData:
                 continue
 
     return MapData(nodes=nodes, links=links, paths=paths)
+
+
+def get_spawn_point(paths: dict[int, Path]) -> list[tuple[int, int, int]]:
+    spawn_point = []
+    for n, path in paths.items():
+        for point in path.get_nodes():
+            if point.is_spawn:
+                spawn_point.append((point.x, point.y, n))
+
+    return spawn_point

@@ -21,6 +21,7 @@ class Car:
         self.current_pos = init_pos   # 시작 위치
         self.stopped = False   # 정지여부
         self.disabled = False  # 활성화 여부
+        self.timer = 0         # 셀프정지 여부 판단용 타이머
 
         self.front_sensor: list[pygame.Vector2] = []
 
@@ -30,8 +31,8 @@ class Car:
         self.__update_front_sensor()
 
     def debug(self, debug_string):
-        debug_string.append(f"car : {self.car_number}")
-        debug_string.append(f"stop  : {self.stopped}")
+        debug_string.append(f"car : {self.car_number}, timer : {self.timer}")
+        debug_string.append(f"stop  : {self.stopped}. disabled : {self.disabled}")
         debug_string.append(f"pos   : {self.current_pos.debug_get_pos()}")
         debug_string.append(f"angle : {self.direction}")
         debug_string.append(f"front_sensor : {self.front_sensor[-1].xy}")
@@ -59,14 +60,12 @@ class Car:
     def __update_direction(self) -> None:
         if self.current_index < len(self.path):
             end_point = self.path[self.current_index].get_vector()
-            self.direction = (end_point - self.current_pos.get_vector()).normalize()
-        else:
-            self.direction = pygame.Vector2(0.0, 0.0)
+            if not end_point == self.current_pos.get_vector():
+                self.direction = (end_point - self.current_pos.get_vector()).normalize()
+                return
+        self.direction = pygame.Vector2(0.0, 0.0)
 
     def __update_shape(self) -> None:
-        if self.direction == pygame.Vector2(0.0, 0.0):
-            return
-
         perp_vec = pygame.Vector2(-self.direction .y, self.direction .x)
         self.shape = [
             self.current_pos.get_vector() + self.direction * (self.width / 2) - perp_vec * (self.height / 2),
@@ -77,7 +76,7 @@ class Car:
 
     def __update_front_sensor(self) -> None:
         self.front_sensor.clear()
-        for d in range(int(self.width / 2) + 10, self.width * 2, 5):
+        for d in range(int(self.width / 2) + 10, self.width * 2, 10):
             point = self.current_pos.get_vector() + self.direction * d
             self.front_sensor.append(point)
 
@@ -98,7 +97,7 @@ class Car:
         flag_car_ahead = False
 
         # 차량이 모든 경로를 주행하여 종료됨
-        if self.current_index >= len(self.path):
+        if self.current_index >= len(self.path) or self.timer > 100:
             self.stopped = True
             self.disabled = True
             return
@@ -113,8 +112,8 @@ class Car:
         # 신호등 검사
         next_point = self.path[self.current_index]
         if next_point.is_juction:
-            if self.current_pos.get_vector().distance_to(next_point.get_vector()) < 100:
-                if next_point.light == TrafficLightColor.red:
+            if self.current_pos.get_vector().distance_to(next_point.get_vector()) < 50:
+                if next_point.light in (TrafficLightColor.red, TrafficLightColor.yellow):
                     flag_red_light = True
                 elif next_point.light == TrafficLightColor.green:
                     flag_red_light = False
@@ -123,9 +122,12 @@ class Car:
 
         # 검사로직 종합
         if flag_car_ahead or flag_red_light:
+            if self.current_index == 0:  # 스폰했는데 못움직이는 상황 검사
+                self.timer += 1
             self.stopped = True
         else:
             self.stopped = False
+            self.timer = 0
         # --------------------------------------------------------------------------------------------------------------
 
         # 정지상태인 경우 위치 업데이트 않함
