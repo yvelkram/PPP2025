@@ -3,9 +3,6 @@ import random
 from engine import *
 
 
-# Todo : 기능추가 - 틱 스피드 건드는 스크롤 바 추가
-
-
 class Game:
     def __init__(self):
         self.WIDTH = 1000
@@ -18,15 +15,18 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("D2Coding", 15)
 
-        # 데이터 호출
+        # --- 맵 데이터 ------------------------------------------------------------------------------------------------
         self.map_data = load_map("./map/map2.dat")
         self.spawn_options = get_spawn_point(self.map_data.paths)
 
+        # --- 변수 -----------------------------------------------------------------------------------------------------
         self.cars: list[Car] = []
         self.car_num = 0
+        self.tick = 60
 
     def main_loop(self, debug_string):
         debug_string.clear()
+        debug_string.append(f"tickspeed : {self.tick}")
         self.screen.fill(Color.WHITE)
 
         # --- 이벤트 처리 파트 -----------------------------------------------------------------------------------------
@@ -43,8 +43,27 @@ class Game:
                 for car in self.cars:
                     if point_in_polygon(pygame.Vector2(event.pos), car.shape):
                         car.disabled = True
+            # 게임 속도 조절
+            # 위/아래 화살표 : 10단위 조절 | 좌/우 화살표 : 1단위 조절 | HOME : 기본값 | END : 최솟값
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_UP:
+                    self.tick += 10
+                if event.key == pygame.K_DOWN:
+                    self.tick -= 10
+                if event.key == pygame.K_RIGHT:
+                    self.tick += 1
+                if event.key == pygame.K_LEFT:
+                    self.tick -= 1
+                if event.key == pygame.K_HOME:
+                    self.tick = 60
+                if event.key == pygame.K_END:
+                    self.tick = 0
 
         # --- 로직 파트 ------------------------------------------------------------------------------------------------
+        # 틱 속도가 음수일 경우 복귀
+        if self.tick < 1:
+            self.tick = 1
+
         # 차량 스폰 (랜덤 확률)
         if random.random() < 0.1:
             spawn_x, spawn_y, path_id = random.choice(self.spawn_options)
@@ -86,7 +105,7 @@ class Game:
 
         # --- 그리기 종료 ----------------------------------------------------------------------------------------------
         pygame.display.flip()
-        self.clock.tick(60)
+        self.clock.tick(self.tick)
 
     def main(self):
         debug_string = []
