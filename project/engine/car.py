@@ -108,8 +108,8 @@ class Car:
         내부함수. 차량 전방 센서 위치 업데이트 (재생성함)
         """
         self.front_sensor.clear()
-        #               시작점(차량길이 반절)   끝점(차량길이 2배)  간격
-        for d in range(int(self.width / 2) + 10, self.width * 2, 10):
+        #               시작점(차량길이 반절)   끝점(차량길이 1.5배)  간격
+        for d in range(int(self.width / 2) + 10, int(self.width * 1.5), 10):
             point = self.current_pos.get_vector() + self.direction * d
             self.front_sensor.append(point)
 

@@ -4,7 +4,6 @@ from engine import *
 
 
 # Todo : 기능추가 - 틱 스피드 건드는 스크롤 바 추가
-# Todo : 버그 - 차량 교차로에서 스틸메이트 현상 존재함.
 
 
 class Game:
@@ -34,11 +33,16 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
-            # 신호등 클릭여부 검사
+            # 마우스 클릭 이벤트
             if event.type == pygame.MOUSEBUTTONUP:
+                # 신호등 검사 로직
                 for _, point in self.map_data.nodes.items():
                     if point.is_juction and point.rect.collidepoint(event.pos):
                         point.toggle()
+                # 교착상태 해결용 차량 클릭 폭파 로직
+                for car in self.cars:
+                    if point_in_polygon(pygame.Vector2(event.pos), car.shape):
+                        car.disabled = True
 
         # --- 로직 파트 ------------------------------------------------------------------------------------------------
         # 차량 스폰 (랜덤 확률)
@@ -47,6 +51,7 @@ class Game:
             self.cars.append(Car(self.car_num, Point(spawn_x, spawn_y), self.map_data.paths[path_id]))
             self.car_num += 1
 
+        # 신호등 황색불 업데이트
         for _, point in self.map_data.nodes.items():
             point.update()
 
