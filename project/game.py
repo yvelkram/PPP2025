@@ -3,10 +3,16 @@ import random
 from engine import *
 
 
+# todo : 스코어 시스템 만들기
+# todo 1. 남은 초시간 계산하기
+# todo 2. 목표 대수 보여주기
+
+
 class Game:
     def __init__(self):
         self.WIDTH = 1000
         self.HEIGHT = 1000
+        self.zoom = 30
 
         # pygame 셋팅
         pygame.init()
@@ -16,7 +22,7 @@ class Game:
         self.font = pygame.font.SysFont("D2Coding", 15)
 
         # --- 맵 데이터 ------------------------------------------------------------------------------------------------
-        self.map_data = load_map("./map/map2.dat")
+        self.map_data = load_map("./map/map3.dat")
         self.spawn_options = get_spawn_point(self.map_data.paths)
 
         # --- 변수 -----------------------------------------------------------------------------------------------------
@@ -24,7 +30,7 @@ class Game:
         self.car_num = 0
         self.tick = 60
 
-    def main_loop(self, debug_string):
+    def main_loop(self, debug_string) -> bool:
         debug_string.clear()
         debug_string.append(f"tickspeed : {self.tick}")
         self.screen.fill(Color.WHITE)
@@ -65,9 +71,9 @@ class Game:
             self.tick = 1
 
         # 차량 스폰 (랜덤 확률)
-        if random.random() < 0.1:
+        if random.random() < self.map_data.spawnrate:
             spawn_x, spawn_y, path_id = random.choice(self.spawn_options)
-            self.cars.append(Car(self.car_num, Point(spawn_x, spawn_y), self.map_data.paths[path_id]))
+            self.cars.append(Car(self.car_num, Point(spawn_x, spawn_y), self.map_data.paths[path_id], self.zoom))
             self.car_num += 1
 
         # 신호등 황색불 업데이트
@@ -81,7 +87,13 @@ class Game:
                              Color.BLACK,
                              link.get_start_pos(),
                              link.get_end_pos(),
-                             30)
+                             self.zoom)
+        # 도로 빈칸채우기
+        for _, point in self.map_data.nodes.items():
+            pygame.draw.circle(self.screen,
+                               Color.BLACK,
+                               point.get_pos(),
+                               self.zoom * 0.45)
 
         # 차량 업데이트 및 그리기
         for n, vehicle in enumerate(self.cars):
@@ -94,7 +106,7 @@ class Game:
 
         # 신호등 그리기
         for _, point in self.map_data.nodes.items():
-            point.draw(self.screen)
+            point.draw(self.screen, self.zoom)
 
         # 디버깅용 텍스트 출력
         y_offset = 10
@@ -106,6 +118,9 @@ class Game:
         # --- 그리기 종료 ----------------------------------------------------------------------------------------------
         pygame.display.flip()
         self.clock.tick(self.tick)
+
+        return False
+
 
     def main(self):
         debug_string = []

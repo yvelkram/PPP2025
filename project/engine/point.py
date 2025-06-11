@@ -78,22 +78,26 @@ class Point:
         else:
             return "None"
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, size: float or int) -> None:
         """
         화면에 신호등을 그리는 함수
         :param screen: display 화면
+        :param size: 신호등 크기 보정
         """
         if not self.is_juction:
             return
 
-        pygame.draw.rect(screen, Color.LIGHT_GRAY, self.rect, 2)
+        if size < 20:
+            size = 20
+
+        pygame.draw.rect(screen, Color.LIGHT_GRAY, self.rect, int(size * 0.067))  # 1/15
         pygame.draw.rect(screen, Color.GRAY, self.rect)
         if self.light == TrafficLightColor.red:
-            pygame.draw.circle(screen, Color.RED, self.rect.center, 5)
+            pygame.draw.circle(screen, Color.RED, self.rect.center, int(size * 0.167))  # 1/6
         elif self.light == TrafficLightColor.yellow:
-            pygame.draw.circle(screen, Color.YELLOW, self.rect.center, 5)
+            pygame.draw.circle(screen, Color.YELLOW, self.rect.center, int(size * 0.167))
         elif self.light == TrafficLightColor.green:
-            pygame.draw.circle(screen, Color.GREEN, self.rect.center, 5)
+            pygame.draw.circle(screen, Color.GREEN, self.rect.center, int(size * 0.167))
 
     def toggle(self) -> None:
         """
@@ -106,8 +110,6 @@ class Point:
                 self.light = TrafficLightColor.red
             case TrafficLightColor.green:
                 self.light = TrafficLightColor.yellow
-            case _:
-                self.light = TrafficLightColor.red
 
     def update(self) -> None:
         """

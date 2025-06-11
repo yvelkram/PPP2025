@@ -7,7 +7,7 @@ class Car:
     """
     자동차 기능
     """
-    def __init__(self, number: int, init_pos: Point, path: Path, speed=2):
+    def __init__(self, number: int, init_pos: Point, path: Path, size, speed=2):
         """
         자동차 생성
         :param number: 차량 고유번호
@@ -16,18 +16,20 @@ class Car:
         :param speed: 옵션, 차량 속도
         """
         # 차량 속성
-        self.car_number = number      # 차량 이름
-        self.path = path.get_nodes()  # 경로 목록
-        self.width = 40     # 차 길이
-        self.height = 20    # 차 너비
-        self.speed = speed  # 차량 속도
-        self.color = Color.BLUE
+        self.car_number = number            # 차량 이름
+        self.path = path.get_nodes()        # 경로 목록
+        self.size = size                    # 차량의 크기 보정 계수
+        self.width = int(self.size * 1.34)  # 차 길이 (zoom의 75%)
+        self.height = int(self.width / 2)   # 차 너비
+        self.speed = speed                  # 차량 속도
+        self.color = Color.BLUE             # 차량 색
+
 
         # 변수
         self.current_index = 0  # 다음 경로 지점 색인번호
         self.direction = pygame.Vector2(0.0, 0.0)  # 차량의 방향
         self.shape: list[pygame.Vector2] = []  # 차량의 모양
-        self.current_pos = init_pos   # 시작 위치
+        self.current_pos = init_pos   # 시작 위치  todo. 경로상에서 바로 접근할 수 있을지도?
         self.stopped = False   # 정지여부
         self.disabled = False  # 활성화 여부
         self.timer = 0         # 셀프정지 여부 판단용 타이머
@@ -183,7 +185,7 @@ class Car:
         self.current_pos.x += move.x
         self.current_pos.y += move.y
 
-        if self.current_pos.get_vector().distance_to(next_point.get_vector()) < 10:
+        if self.current_pos.get_vector().distance_to(next_point.get_vector()) < 1:
             self.current_index += 1
             self.__update_direction()
 

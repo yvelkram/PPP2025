@@ -1,3 +1,6 @@
+[SETTINGS]
+.spawnrate 0.1
+
 [NODE]
 T 1 500,500
 S 2 -100,500

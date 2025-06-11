@@ -4,6 +4,7 @@ from .point import Point, Link, Path
 
 @dataclass
 class MapData:
+    spawnrate: int
     nodes: dict[int, Point]  # 노드 리스트 (신호등, 스폰점 포함)
     links: dict[int, Link]   # 링크 리스트
     paths: dict[int, Path]   # 경로 리스트
@@ -18,12 +19,17 @@ def load_map(file_path) -> MapData:
     nodes: dict[int, Point] = {}
     links: dict[int, Link] = {}
     paths: dict[int, Path] = {}
+    spawnrate = 0
 
     with open(file_path, 'r') as f:
         for ln in f:
             ln = ln.strip()
 
-            if ln.startswith("N"):  # 일반 노드
+            if ln.startswith(".spawnrate"):
+                _, speed = ln.split()
+                spawnrate = float(speed)
+
+            elif ln.startswith("N"):  # 일반 노드
                 _, node_id, coords = ln.split()
                 x, y = coords.split(',')
                 nodes[int(node_id)] = Point(int(x), int(y))
@@ -50,7 +56,7 @@ def load_map(file_path) -> MapData:
             else:  # 아무것도 아닌 줄
                 continue
 
-    return MapData(nodes=nodes, links=links, paths=paths)
+    return MapData(spawnrate=spawnrate, nodes=nodes, links=links, paths=paths)
 
 
 def get_spawn_point(paths: dict[int, Path]) -> list[tuple[int, int, int]]:

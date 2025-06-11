@@ -1,3 +1,6 @@
+[SETTINGS]
+.spawnrate 0.1
+
 [NODE]
 N 1 100,470
 N 2 100,490
