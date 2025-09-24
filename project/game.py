@@ -22,7 +22,7 @@ class Game:
         self.font = pygame.font.SysFont("D2Coding", 15)
 
         # --- 맵 데이터 ------------------------------------------------------------------------------------------------
-        self.map_data = load_map("./map/map3.dat")
+        self.map_data = load_map("./map/map2.dat")
         self.spawn_options = get_spawn_point(self.map_data.paths)
 
         # --- 변수 -----------------------------------------------------------------------------------------------------
