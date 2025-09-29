@@ -1,20 +1,23 @@
 import re
 import json
+import pypdf
 import pathlib
+from dataclasses import dataclass
 
 # --- STRUCTURE --------------------------------------------------------------------------------------------------------
-# 단일 섹션
+@dataclass
 class Section:
     section_title: str  # 단락 명 (1. Introduction 또는 2.1. SVF application possibilities)
     text: str           # 단락 내용
     indexed_text: any   # 인덱싱된 내용
 
+@dataclass
 class Asset:
     asset_title: str    # 에셋 명 (Fig. 1)
     asset_caption: str  # 에셋 캡션
     asset_data: any     # 에셋 데이터 위치
 
-# 단일 논문
+# --- MAIN MODULE ------------------------------------------------------------------------------------------------------
 class Paper:
     pdf_path: pathlib.Path   # 원본 파일 위치
     metadata: dict           # title, authors, year, doi, journal 등
@@ -26,17 +29,148 @@ class Paper:
     def __init__(self, pdf_path):
         self.pdf_path = pdf_path
 
+    # --- internal parsing ---------------------------------------------------------------------------------------------
+    def __extract_text_pages(self) -> list[str]:
+        """
+        가능한 경우 pypdf(PyPDF2)로 텍스트 추출, 실패 시 아주 단순한 바이너리 디코딩 폴백.
+        """
+        pages: list[str] = []
+        reader = pypdf.PdfReader(str(self.pdf_path))
+        for p in reader.pages:
+            txt = p.extract_text() or ""
+            pages.append(txt)
+        if any(pages):
+            return pages
 
+        return [""]
+
+    def __build_basic_metadata(self, first_page: str) -> dict:
+        """
+        매우 단순한 휴리스틱으로 메타데이터 추정
+        """
+        lines = [l.strip() for l in first_page.splitlines() if l.strip()]
+        title = lines[0] if lines else self.pdf_path.stem
+
+        # 저자: 보통 제목 다음 한두 줄, 콤마/and로 구분된 라인 가정
+        authors = []
+        if len(lines) > 1:
+            cand = lines[1]
+            # 숫자나 기관표기 제거 대충
+            cand = re.sub(r"\d+|\(|\)|\*|\†|\‡", "", cand)
+            # 'and' → comma
+            cand = cand.replace(" and ", ", ")
+            # 이메일/도메인 제거
+            cand = re.sub(r"\S+@\S+", "", cand)
+            if any(x in cand for x in [",", " ", ";"]):
+                authors = [a.strip() for a in re.split(r",|;|·|\band\b", cand) if a.strip()]
+                # 너무 길거나 기관명 느낌이면 걸러내기
+                authors = [a for a in authors if len(a.split()) <= 4][:12]
+
+        # DOI
+        doi = None
+        m = re.search(r"\b(10\.\d{4,9}/\S+)\b", first_page, flags=re.I)
+        if m:
+            doi = m.group(1).rstrip(").,]")
+
+        # 연도
+        year = None
+        ym = re.search(r"(19|20)\d{2}", first_page)
+        if ym:
+            try:
+                y = int(ym.group(0))
+                if 1900 <= y <= 2100:
+                    year = y
+            except Exception:
+                pass
+
+        # 저널/키워드(아주 약한 추정)
+        journal = None
+        jm = re.search(r"(?:journal|Proceedings|Transactions|Conference|Nature|Science|PeerJ|Elsevier|Springer)", first_page, flags=re.I)
+        if jm:
+            journal = jm.group(0)
+
+        keywords = []
+        # 'Keywords:' 라인 추정
+        for ln in lines[:50]:
+            if re.match(r"(?i)keywords?\s*[:\-]", ln):
+                ks = re.split(r"[:\-]", ln, maxsplit=1)[-1]
+                keywords = [k.strip() for k in ks.split(",") if k.strip()]
+                break
+
+        return {
+            "title": title,
+            "authors": authors,
+            "year": year,
+            "doi": doi,
+            "journal": journal,
+            "keywords": keywords,
+        }
+
+    def __split_sections(self, full_text: str) -> list[Section]:
+        """
+        아주 단순한 섹션 분리 휴리스틱:
+        - 숫자 기반 헤딩: "1 ", "1.", "2.1 " 등
+        - 자주 쓰는 헤딩 키워드도 보조
+        """
+        # 라인 정리
+        lines = [re.sub(r"\s+", " ", l).strip() for l in full_text.splitlines()]
+        text = "\n".join(lines)
+
+        # 섹션 헤더 패턴
+        header_regex = re.compile(
+            r"(?m)^(?:\d+(?:\.\d+){0,2}\s*[\.|\)]\s*|(?:\d+\s+))?(Abstract|Introduction|Background|Methods|Materials and Methods|Method|Results|Discussion|Conclusion|Conclusions|References)\b",
+            flags=re.I
+        )
+
+        # 헤더 인덱스 찾기
+        matches = list(header_regex.finditer(text))
+        sections: list[Section] = []
+
+        if not matches:
+            # 헤더 못 찾으면 전체를 하나의 섹션으로
+            return [Section(section_title="Body", text=text)]
+
+        # 구간 슬라이스
+        starts = [m.start() for m in matches] + [len(text)]
+        for i, m in enumerate(matches):
+            title = m.group(0).strip()
+            start = m.end()
+            end = starts[i+1]
+            body = text[start:end].strip()
+            sections.append(Section(section_title=title, text=body))
+
+        return sections
+
+    def __extract_assets(self, full_text: str) -> list[Asset]:
+        """
+        'Fig. 1', 'Table 2' 등 간단 캡션 추출(휴리스틱)
+        """
+        assets: list[Asset] = []
+        for m in re.finditer(r"(?m)^(Fig(?:ure)?\.?\s*\d+|Table\.?\s*\d+)\s*[:\-]?\s*(.+)$", full_text):
+            assets.append(Asset(asset_title=m.group(1).strip(), asset_caption=m.group(2).strip()))
+        return assets
+
+    # --- PUBLIC -------------------------------------------------------------------------------------------------------
     def parse_pdf(self) -> None:
         """
         논문 pdf를 불러와서 sections로 분리하는 기능
         """
-        # 파일 열기, self.raw_text에 전체 택스트 저장
-        pass
+        # 파일 열기, self.raw_text에 전체 텍스트 저장
+        self.raw_text = self.__extract_text_pages()
+        full_text = "\n".join(self.raw_text)
 
-        # 섹션별로 데이터 소분, self.sections에 저장.
-        # 표, 그림은 self.assets에 저장. (캡션 번호가 key, 단락 내용이 valye)
-        pass
+        print(full_text)
+
+        raise NotImplementedError
+
+        # 메타데이터(제목/저자/연도/DOI/저널/키워드) 추정
+        self.metadata = self.__build_basic_metadata(self.raw_text[0] if self.raw_text else "")
+
+        # 섹션 분리
+        self.sections = self.__split_sections(full_text)
+
+        # 에셋 추출
+        self.assets = self.__extract_assets(full_text)
 
 
     def retrieval_paper(self) -> None:

@@ -66,10 +66,10 @@ class PaperWork:
             paper.validate_outputs(self.prompt_schema)
             paper.normalize_fields()
 
-    def export(self, output_path: str):
+    def export(self, output_path: pathlib.Path):
         rows = []
         for paper in self.papers:
             row = paper.export_to_paper()
             rows.append(row)
-        write_csv(output_path, rows)
+        write_csv(str(output_path), rows)
         if self.debug: print(f"exported to {output_path}")

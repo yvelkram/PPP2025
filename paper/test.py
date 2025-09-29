@@ -10,3 +10,10 @@ def main():
     pw = PaperWork(paper_input, prompt_path, "gpt-5", True)
     pw.process()
     pw.export(output_path)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except NotImplementedError:
+        pass
