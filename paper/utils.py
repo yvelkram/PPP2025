@@ -1,4 +1,5 @@
 import re
+import csv
 import json
 import pypdf
 import pathlib
@@ -6,10 +7,10 @@ from dataclasses import dataclass
 
 # --- STRUCTURE --------------------------------------------------------------------------------------------------------
 @dataclass
-class Section:
-    section_title: str  # 단락 명 (1. Introduction 또는 2.1. SVF application possibilities)
-    text: str           # 단락 내용
-    indexed_text: any   # 인덱싱된 내용
+class Chunk:
+    chunk_no: int        # 청크 일련번호
+    chunk_text: str      # 청크 원본텍스트
+    chunk_indexed: dict  # 청크 인덱스
 
 @dataclass
 class Asset:
@@ -20,177 +21,82 @@ class Asset:
 # --- MAIN MODULE ------------------------------------------------------------------------------------------------------
 class Paper:
     pdf_path: pathlib.Path   # 원본 파일 위치
-    metadata: dict           # title, authors, year, doi, journal 등
-    sections: list[Section]  # 본문 섹션 데이터
-    assets: list[Asset]      # 논문의 표, 그림 등
-    raw_text: list[str]      # 페이지별 원문 텍스트
-    final_summary: any       # 콤마로 구분된 최종 요약물
+    title: str
+    authors: str
+    year: int
+
+    raw_text: str        # 원문 텍스트
+    chunks: list[Chunk]  # 분할되어 가공된 텍스트
+    assets: list[Asset]  # 논문의 표, 그림 등
+
+    llm_summary_raw: str
+    final_summary: any   # 콤마로 구분된 최종 요약물
 
     def __init__(self, pdf_path):
         self.pdf_path = pdf_path
 
-    # --- internal parsing ---------------------------------------------------------------------------------------------
-    def __extract_text_pages(self) -> list[str]:
-        """
-        가능한 경우 pypdf(PyPDF2)로 텍스트 추출, 실패 시 아주 단순한 바이너리 디코딩 폴백.
-        """
-        pages: list[str] = []
-        reader = pypdf.PdfReader(str(self.pdf_path))
-        for p in reader.pages:
-            txt = p.extract_text() or ""
-            pages.append(txt)
-        if any(pages):
-            return pages
+    # --- PRIVATE ------------------------------------------------------------------------------------------------------
 
-        return [""]
-
-    def __build_basic_metadata(self, first_page: str) -> dict:
-        """
-        매우 단순한 휴리스틱으로 메타데이터 추정
-        """
-        lines = [l.strip() for l in first_page.splitlines() if l.strip()]
-        title = lines[0] if lines else self.pdf_path.stem
-
-        # 저자: 보통 제목 다음 한두 줄, 콤마/and로 구분된 라인 가정
-        authors = []
-        if len(lines) > 1:
-            cand = lines[1]
-            # 숫자나 기관표기 제거 대충
-            cand = re.sub(r"\d+|\(|\)|\*|\†|\‡", "", cand)
-            # 'and' → comma
-            cand = cand.replace(" and ", ", ")
-            # 이메일/도메인 제거
-            cand = re.sub(r"\S+@\S+", "", cand)
-            if any(x in cand for x in [",", " ", ";"]):
-                authors = [a.strip() for a in re.split(r",|;|·|\band\b", cand) if a.strip()]
-                # 너무 길거나 기관명 느낌이면 걸러내기
-                authors = [a for a in authors if len(a.split()) <= 4][:12]
-
-        # DOI
-        doi = None
-        m = re.search(r"\b(10\.\d{4,9}/\S+)\b", first_page, flags=re.I)
-        if m:
-            doi = m.group(1).rstrip(").,]")
-
-        # 연도
-        year = None
-        ym = re.search(r"(19|20)\d{2}", first_page)
-        if ym:
-            try:
-                y = int(ym.group(0))
-                if 1900 <= y <= 2100:
-                    year = y
-            except Exception:
-                pass
-
-        # 저널/키워드(아주 약한 추정)
-        journal = None
-        jm = re.search(r"(?:journal|Proceedings|Transactions|Conference|Nature|Science|PeerJ|Elsevier|Springer)", first_page, flags=re.I)
-        if jm:
-            journal = jm.group(0)
-
-        keywords = []
-        # 'Keywords:' 라인 추정
-        for ln in lines[:50]:
-            if re.match(r"(?i)keywords?\s*[:\-]", ln):
-                ks = re.split(r"[:\-]", ln, maxsplit=1)[-1]
-                keywords = [k.strip() for k in ks.split(",") if k.strip()]
-                break
-
-        return {
-            "title": title,
-            "authors": authors,
-            "year": year,
-            "doi": doi,
-            "journal": journal,
-            "keywords": keywords,
-        }
-
-    def __split_sections(self, full_text: str) -> list[Section]:
-        """
-        아주 단순한 섹션 분리 휴리스틱:
-        - 숫자 기반 헤딩: "1 ", "1.", "2.1 " 등
-        - 자주 쓰는 헤딩 키워드도 보조
-        """
-        # 라인 정리
-        lines = [re.sub(r"\s+", " ", l).strip() for l in full_text.splitlines()]
-        text = "\n".join(lines)
-
-        # 섹션 헤더 패턴
-        header_regex = re.compile(
-            r"(?m)^(?:\d+(?:\.\d+){0,2}\s*[\.|\)]\s*|(?:\d+\s+))?(Abstract|Introduction|Background|Methods|Materials and Methods|Method|Results|Discussion|Conclusion|Conclusions|References)\b",
-            flags=re.I
-        )
-
-        # 헤더 인덱스 찾기
-        matches = list(header_regex.finditer(text))
-        sections: list[Section] = []
-
-        if not matches:
-            # 헤더 못 찾으면 전체를 하나의 섹션으로
-            return [Section(section_title="Body", text=text)]
-
-        # 구간 슬라이스
-        starts = [m.start() for m in matches] + [len(text)]
-        for i, m in enumerate(matches):
-            title = m.group(0).strip()
-            start = m.end()
-            end = starts[i+1]
-            body = text[start:end].strip()
-            sections.append(Section(section_title=title, text=body))
-
-        return sections
-
-    def __extract_assets(self, full_text: str) -> list[Asset]:
-        """
-        'Fig. 1', 'Table 2' 등 간단 캡션 추출(휴리스틱)
-        """
-        assets: list[Asset] = []
-        for m in re.finditer(r"(?m)^(Fig(?:ure)?\.?\s*\d+|Table\.?\s*\d+)\s*[:\-]?\s*(.+)$", full_text):
-            assets.append(Asset(asset_title=m.group(1).strip(), asset_caption=m.group(2).strip()))
-        return assets
 
     # --- PUBLIC -------------------------------------------------------------------------------------------------------
-    def parse_pdf(self) -> None:
+    def parse_pdf(self, chunk_chars: int = 2500, overlap_chars: int = 300) -> None:
         """
         논문 pdf를 불러와서 sections로 분리하는 기능
+        :param chunk_chars: 한 청크당 글자수
+        :param overlap_chars: 겹쳐지는 글자수
         """
-        # 파일 열기, self.raw_text에 전체 텍스트 저장
-        self.raw_text = self.__extract_text_pages()
-        full_text = "\n".join(self.raw_text)
+        # --- pdf 파일에서 텍스트 추출
+        reader = pypdf.PdfReader(str(self.pdf_path))
+        texts: list[str] = []
+        for i, page in enumerate(reader.pages):
+            t = page.extract_text()
+            texts.append(t)
+        self.raw_text = "\n".join(texts).strip()
 
-        print(full_text)
-
-        raise NotImplementedError
-
-        # 메타데이터(제목/저자/연도/DOI/저널/키워드) 추정
-        self.metadata = self.__build_basic_metadata(self.raw_text[0] if self.raw_text else "")
-
-        # 섹션 분리
-        self.sections = self.__split_sections(full_text)
-
-        # 에셋 추출
-        self.assets = self.__extract_assets(full_text)
-
+        # --- 텍스트를 일정 길이로 청크화
+        text_length = len(self.raw_text)
+        start = 0
+        i = 0
+        step = chunk_chars - overlap_chars  # 시작점 = 한 청크당 글자수 - 오버랩 글자수
+        while start < text_length:
+            end = min(start + chunk_chars, text_length)
+            self.chunks.append(Chunk(i, self.raw_text[start:end], dict()))
+            start += step
+            i += 1
 
     def retrieval_paper(self) -> None:
         """
-        논문 데이터 인덱싱
+        논문 데이터 인덱싱, 용어-빈도 인덱스 생성
         """
-        # 각각 self.sections의 .text 내용을 인덱싱하여 .indexed_text에 저장
-        pass
+        for chunk in self.chunks:
+            tokens = [t.lower()  # 소문자화
+                      for t in re.findall(r"[A-Za-z0-9]+|[가-힣]+", chunk.chunk_text)  # 글자만 추출
+                      if len(t) > 1]  # 한글자는 노이즈로 간주
+            terms: dict[str, int] = {}
+            for token in tokens:
+                terms[token] = terms.get(token, 0) + 1
+            top_terms = sorted(terms.items(), key=lambda x: x[1], reverse=True[:30])
 
-    def select_context(self) -> None:
-        pass
+            index_dict = {"lenght": len(tokens), "terms": terms, "top_terms": top_terms}
+            chunk.chunk_indexed = index_dict
+
+    def dump(self, preview_chars: int = 160) -> None:
+        """
+        객체의 내용을 덤프하는 기능
+        """
+        print(f"[DEBUG] file = {self.pdf_path.name}, sections = {len(self.chunks)}")
+        for c in self.chunks[:5]:  # 앞부분만 미리보기
+            txt = (c.chunk_text[:preview_chars] + "…") if len(c.chunk_text) > preview_chars else c.chunk_text
+            print(f"  - #{c.chunk_no} ({len(c.chunk_text)} chars): {txt.replace('\\n', ' ')}")
 
     def validate_outputs(self, prompt_schema) -> None:
-        pass
+        raise NotImplementedError
 
     def normalize_fields(self) -> None:
-        pass
+        raise NotImplementedError
 
     def export_to_paper(self):
-        pass
+        raise NotImplementedError
 
 
 # --- COMMON FEATURES --------------------------------------------------------------------------------------------------
@@ -215,23 +121,12 @@ def load_paper(pdf_master_path: pathlib.Path) -> list[Paper]:
     return [Paper(pdf) for pdf in pdf_files]
 
 
-def dump(paper: Paper, stage: str) -> None:
-    """
-    Paper 객체 덤프
-    :param paper: 객체
-    :param stage: 각 단계별
-    """
-    pass
-
-
-def write_csv(output_path: str, rows: list[str]) -> None:
-    """
-    최종 파일 제작
-    :param output_path: 저장 위치
-    :param rows: 저장할 데이터들
-    """
-    pass
-
+def write_csv(path: str, rows: list[list[str]]) -> None:
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        for r in rows:
+            writer.writerow(r)
 
 # LLM FEATURES ---------------------------------------------------------------------------------------------------------
 def build_fields_block(schema: dict) -> str:
@@ -241,13 +136,6 @@ def build_fields_block(schema: dict) -> str:
     :return: 한줄로 만들어진 항목
     """
     return ", ".join([f["key"] for f in schema["fields"]])
-
-
-def escape_commas(text: str, escape_comma: str) -> str:
-    # 콤마 전환 기능 (아직 이해못함)
-    if text is None:
-        return ""
-    return text.replace(",", escape_comma)
 
 
 def format_list_inline(items: list[str], prefix: str) -> str:
@@ -260,109 +148,3 @@ def format_list_inline(items: list[str], prefix: str) -> str:
     line = [i.strip() for i in items if i and i.strip()]
     return " ".join([f"{prefix}{s}" for s in line])
 
-
-def assemble_user_prompt(schema: dict, rag_ctx: dict) -> str:
-    """
-    LLM에 넣을 프롬프트 조립
-    :param schema:
-    :param rag_ctx:
-    :return:
-    """
-    tpl_lines = schema["roles"]["user_template"]
-    comma_escape = schema["output"]["comma_escape_char"]
-    list_prefix = schema["output"]["list_item_prefix"]
-
-    # metadata block
-    md = rag_ctx.get("metadata", {})
-    md_lines = []
-    for k in ["title","authors","year","journal","keywords"]:
-        v = md.get(k, "")
-        if isinstance(v, list):
-            v = ", ".join(v)
-        md_lines.append(f"- {k}: {escape_commas(str(v), comma_escape)}")
-    metadata_block = "\n".join(md_lines)
-
-    # intro/methods/results block (이미 select_context에서 만들어온 요약 문자열 사용)
-    intro_block = escape_commas(rag_ctx.get("intro_block", ""), comma_escape)
-    methods_block = escape_commas(rag_ctx.get("methods_block", ""), comma_escape)
-    results_block = escape_commas(rag_ctx.get("results_block", ""), comma_escape)
-
-    fields_block = build_fields_block(schema)
-
-    prompt = "\n".join(tpl_lines)
-    prompt = prompt.replace("{metadata_block}", metadata_block)
-    prompt = prompt.replace("{intro_block}", intro_block)
-    prompt = prompt.replace("{methods_block}", methods_block)
-    prompt = prompt.replace("{results_block}", results_block)
-    prompt = prompt.replace("{fields_block}", fields_block)
-    return prompt
-
-
-def parse_llm_csv_line(raw: str, schema: dict) -> dict:
-    # 아주 단순한 CSV-like 파서 (필드 개수로 split)
-    keys = [f["key"] for f in schema["fields"]]
-    parts = [p.strip() for p in raw.split(",")]
-    if len(parts) < len(keys):
-        parts += [""] * (len(keys) - len(parts))
-    parts = parts[:len(keys)]
-    return dict(zip(keys, parts))
-
-
-def normalize_fields(parsed: dict, schema: dict) -> dict:
-    # 리스트형 필드는 "*항목1 *항목2"를 다시 리스트로 복원해서 저장(내보낼 땐 다시 인라인)
-    list_prefix = schema["output"]["list_item_prefix"]
-    list_keys = {f["key"] for f in schema["fields"] if f["type"] == "list"}
-    out = {}
-    for k, v in parsed.items():
-        if k in list_keys:
-            # "*a *b" -> ["a","b"]
-            items = [s.strip() for s in v.split(list_prefix) if s.strip()]
-            out[k] = items
-        else:
-            out[k] = v.strip()
-    return out
-
-
-def to_csv_line_for_export(rec: dict, schema: dict) -> str:
-    # 내보낼 때: 리스트는 다시 "*a *b"로 합치고, 내부 콤마는 이미 전각으로 치환되어 있다고 가정
-    list_prefix = schema["output"]["list_item_prefix"]
-    ordered = []
-    for f in schema["fields"]:
-        k = f["key"]
-        v = rec.get(k, "")
-        if isinstance(v, list):
-            v = " ".join([f"{list_prefix}{x}" for x in v])
-        ordered.append(v)
-    return ",".join(ordered)
-
-
-def select_context_from_sections(paper, context_policy: dict) -> dict:
-    # 실제 구현에서는 embedding/RAG를 써서 top_k 선택.
-    # 여기서는 구조만: 섹션 이름으로 필터 후 상위 k개 문단을 이어 붙이고 글자수 제한 적용.
-    def gather(section_names, top_k, max_chars):
-        chunks = []
-        # paper.sections: Section(section_title, text, indexed_text)
-        for s in paper.sections:
-            title = (s.section_title or "").lower()
-            if any(name in title for name in section_names):
-                # indexed_text가 있다면 그 중 score 상위 k개를 사용했다고 가정
-                if s.indexed_text and isinstance(s.indexed_text, list):
-                    # [(score, text), ...] 형태라고 가정
-                    tops = sorted(s.indexed_text, key=lambda x: x[0], reverse=True)[:top_k]
-                    chunks.extend([t[1] for t in tops])
-                else:
-                    chunks.append(s.text)
-        joined = " ".join(chunks)[:max_chars]
-        return joined
-
-    return {
-        "intro_block":   gather(context_policy["intro_block"]["sections"],
-                                context_policy["intro_block"]["top_k"],
-                                context_policy["intro_block"]["max_chars"]),
-        "methods_block": gather(context_policy["methods_block"]["sections"],
-                                context_policy["methods_block"]["top_k"],
-                                context_policy["methods_block"]["max_chars"]),
-        "results_block": gather(context_policy["results_block"]["sections"],
-                                context_policy["results_block"]["top_k"],
-                                context_policy["results_block"]["max_chars"])
-    }
