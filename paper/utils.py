@@ -159,12 +159,6 @@ class Paper:
             txt = (c.chunk_text[:preview_chars] + "…") if len(c.chunk_text) > preview_chars else c.chunk_text
             print(f"  - #{c.chunk_no} ({len(c.chunk_text)} chars): {txt.replace('\\n', ' ')}")
 
-    def validate_outputs(self, prompt_schema) -> None:
-        raise NotImplementedError
-
-    def normalize_fields(self) -> None:
-        raise NotImplementedError
-
     def export_to_paper(self):
         raise NotImplementedError
 
