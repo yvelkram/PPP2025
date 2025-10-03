@@ -12,6 +12,16 @@ class Chunk:
     chunk_text: str      # 청크 원본텍스트
     chunk_indexed: dict  # 청크 인덱스
 
+    def score_chunk_by_terms(self, term_weights: dict[str, float]) -> float:
+        """
+        청크를 term_weights의 가중치 정보로 점수화
+        """
+        terms: dict[str, int] = self.chunk_indexed.get("terms", {})
+        score: float = 0.0
+        for term, w in term_weights.items():
+            score += w * float(terms.get(term.lower(), 0))  # 소문자 기준
+        return score
+
 @dataclass
 class Asset:
     asset_title: str    # 에셋 명 (Fig. 1)
@@ -20,23 +30,45 @@ class Asset:
 
 # --- MAIN MODULE ------------------------------------------------------------------------------------------------------
 class Paper:
-    pdf_path: pathlib.Path   # 원본 파일 위치
-    title: str
-    authors: str
-    year: int
-
-    raw_text: str        # 원문 텍스트
-    chunks: list[Chunk]  # 분할되어 가공된 텍스트
-    assets: list[Asset]  # 논문의 표, 그림 등
-
-    llm_summary_raw: str
-    final_summary: any   # 콤마로 구분된 최종 요약물
-
     def __init__(self, pdf_path):
-        self.pdf_path = pdf_path
+        self.pdf_path: pathlib.Path = pdf_path  # 원본 파일 위치
+
+        self.raw_text: str = ""        # 원문 텍스트
+        self.chunks: list[Chunk] = []  # 분할되어 가공된 텍스트
+        self.assets: list[Asset] = []  # 논문의 표, 그림 등
+
+        self.llm_summary_raw: str = ""
+        self.final_summary: any = None  # 콤마로 구분된 최종 요약물
 
     # --- PRIVATE ------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def __join_chunks_with_limit(chunks: list[Chunk], max_chars: int) -> str:
+        """문자수 제한 안에서 청크들을 순서대로 결합"""
+        out, used = [], 0
+        for c in chunks:
+            t = c.chunk_text.strip()
+            if used + len(t) + 2 > max_chars:
+                remain = max_chars - used - 2
+                if remain > 0:
+                    out.append(t[:remain])
+                break
+            out.append(t)
+            used += len(t) + 2  # \n\n 여유
+        return "\n\n".join(out)
 
+    def __select_chunks_by_keywords(self, keyword_groups: list[str], top_k: int, ) -> list[Chunk]:
+        """
+        키워드 목록으로 청크 점수화 후 상위 K개 선택.
+        keyword_groups는 'introduction', 'methods' 같은 섹션명 힌트가 아니라,
+        실제 점수화에 쓸 토큰 문자열 리스트입니다.
+        """
+        # 간단 가중치: 모든 키워드 1.0
+        weights = {k.lower(): 1.0 for k in keyword_groups if k and k.strip()}
+        scored = [(c, c.score_chunk_by_terms(weights)) for c in self.chunks]
+        # 점수 0인 것도 fallback을 위해 포함하되, 높은 점수부터
+        scored.sort(key=lambda x: x[1], reverse=True)
+        picked = [c for c, s in scored[:max(1, top_k)]]
+        return picked
 
     # --- PUBLIC -------------------------------------------------------------------------------------------------------
     def parse_pdf(self, chunk_chars: int = 2500, overlap_chars: int = 300) -> None:
@@ -75,10 +107,48 @@ class Paper:
             terms: dict[str, int] = {}
             for token in tokens:
                 terms[token] = terms.get(token, 0) + 1
-            top_terms = sorted(terms.items(), key=lambda x: x[1], reverse=True[:30])
+            top_terms = sorted(terms.items(), key=lambda x: x[1], reverse=True)[:30]
 
             index_dict = {"lenght": len(tokens), "terms": terms, "top_terms": top_terms}
             chunk.chunk_indexed = index_dict
+
+    def build_context_blocks_from_freq(self, schema: dict) -> dict:
+        """
+        스키마의 context_policy(top_k, max_chars)를 반영하여
+        intro/methods/results 블록을 빈도 기반으로 구성
+        """
+        kw_intro = ["introduction", "background", "overview", "motivation", "문헌", "배경", "서론", "관련연구"]
+        kw_methods = ["method", "methods", "methodology", "data", "dataset", "실험", "모형", "모델", "자료", "변수", "방법"]
+        kw_results = ["result", "results", "finding", "findings", "discussion", "conclusion", "시사점", "결과", "논의", "결론"]
+
+        cp = schema.get("context_policy", {})
+        intro_cfg = cp.get("intro_block", {})
+        methods_cfg = cp.get("methods_block", {})
+        results_cfg = cp.get("results_block", {})
+
+        intro_top_k = int(intro_cfg.get("top_k", 6))
+        methods_top_k = int(methods_cfg.get("top_k", 8))
+        results_top_k = int(results_cfg.get("top_k", 8))
+
+        intro_max = int(intro_cfg.get("max_chars", 2500))
+        methods_max = int(methods_cfg.get("max_chars", 3000))
+        results_max = int(results_cfg.get("max_chars", 3000))
+
+        # 상위 K 청크 선정
+        intro_chunks = self.__select_chunks_by_keywords(kw_intro, top_k=intro_top_k)
+        methods_chunks = self.__select_chunks_by_keywords(kw_methods, top_k=methods_top_k)
+        results_chunks = self.__select_chunks_by_keywords(kw_results, top_k=results_top_k)
+
+        # 문자수 제한 내 결합
+        intro_text = self.__join_chunks_with_limit(intro_chunks, intro_max)
+        methods_text = self.__join_chunks_with_limit(methods_chunks, methods_max)
+        results_text = self.__join_chunks_with_limit(results_chunks, results_max)
+
+        return {
+            "intro_block": intro_text,
+            "methods_block": methods_text,
+            "results_block": results_text,
+        }
 
     def dump(self, preview_chars: int = 160) -> None:
         """
@@ -148,3 +218,32 @@ def format_list_inline(items: list[str], prefix: str) -> str:
     line = [i.strip() for i in items if i and i.strip()]
     return " ".join([f"{prefix}{s}" for s in line])
 
+
+def assemble_user_prompt(*, user_template_lines: list[str], fields_block: str, schema: dict, rag_context: dict) -> str:
+    """
+    prompt_schema.json의 user_template(list[str])에 rag_context를 채워 넣어 최종 문자열로 변환
+    """
+    # 메타 블록은 key: value 줄바꿈 나열
+    meta = rag_context.get("metadata", {}) or {}
+    meta_lines = []
+    include_list = schema.get("context_policy", {}).get("metadata_block", {}).get("include", [])
+    if include_list:
+        for k in include_list:
+            v = meta.get(k, "n/a")
+            # authors, keywords가 리스트면 join
+            if isinstance(v, list):
+                v = ", ".join(v) if v else "n/a"
+            meta_lines.append(f"- {k}: {v}")
+    metadata_block = "\n".join(meta_lines) if meta_lines else "n/a"
+
+    # 필드 헤더
+    fields_block_text = fields_block
+
+    _fmt = {
+        "metadata_block": metadata_block,
+        "intro_block": rag_context.get("intro_block", ""),
+        "methods_block": rag_context.get("methods_block", ""),
+        "results_block": rag_context.get("results_block", ""),
+        "fields_block": fields_block_text
+    }
+    return "\n".join(user_template_lines).format(**_fmt)

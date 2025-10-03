@@ -1,6 +1,5 @@
 from utils import *
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 import pathlib
 
@@ -30,7 +29,6 @@ class PaperWork:
 
         # --- 요약 실행 준비
         sys_msg = self.prompt_schema["roles"]["system"]
-        ctx_policy = self.prompt_schema["context_policy"]
         user_template_lines = self.prompt_schema["roles"]["user_template"]
 
         llm_client = ChatOpenAI(model=self.llm, temperature=0)
@@ -40,32 +38,35 @@ class PaperWork:
 
         # --- 논문별 요약 실행
         for paper in self.papers:
-            # (a) 컨텍스트 선택(선언적 정책 사용)
-            ctx_blocks = select_context_from_sections(paper, self.ctx_policy)
+            # 1) 블록 텍스트(빈도 기반) 만들기
+            blocks = paper.build_context_blocks_from_freq(self.prompt_schema)
+
             rag_context = {
-                "metadata": paper.metadata,  # Paper.metadata 프로퍼티 제공(아래 utils.py 수정)
-                **ctx_blocks
+                "metadata": {
+                    "title": "알 수 없음",
+                    "authors": [],
+                    "year": "알 수 없음",
+                    "journal": "알 수 없음",
+                    "keywords": []
+                },
+                "intro_block": blocks["intro_block"],
+                "methods_block": blocks["methods_block"],
+                "results_block": blocks["results_block"],
             }
-            # (b) JSON 템플릿 + RAG 컨텍스트로 유저 프롬프트 조립
+
             user_prompt = assemble_user_prompt(
-                user_template_lines=self.user_template_lines,
-                fields_block=self.fields_block,
-                schema=self.schema,
+                user_template_lines=user_template_lines,
+                fields_block=fields_block,
+                schema=self.prompt_schema,
                 rag_context=rag_context
             )
 
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", self.sys_msg),
-                ("user", user_prompt),
-            ])
-            chain = prompt | self.llm_client | self.output_parser
+            paper.llm_summary_raw = f"{sys_msg}\n\n{user_prompt}"
 
-            raw = chain.invoke({})
-            paper.llm_summary_raw = raw  # 원문 저장(디버깅용)
-
-            # (c) 스키마 기반 파싱/정규화
-            parsed = parse_llm_csv_line(raw, self.schema)
-            paper.final_summary = normalize_fields(parsed, self.schema)  # 리스트[str] 반환
+            if self.debug:
+                # 프롬프트 처음 600자 미리보기
+                preview = paper.llm_summary_raw[:600].replace("\n", " ")
+                print(f"[DEBUG] prompt preview for {paper.pdf_path.name}: {preview}...")
 
         # --- 검증 및 정규화
         for paper in self.papers:
