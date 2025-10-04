@@ -37,6 +37,7 @@ class Paper:
         self.chunks: list[Chunk] = []  # 분할되어 가공된 텍스트
         self.assets: list[Asset] = []  # 논문의 표, 그림 등
 
+        self.llm_input: str = ""
         self.llm_summary_raw: str = ""
         self.final_summary: any = None  # 콤마로 구분된 최종 요약물
 
