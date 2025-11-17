@@ -56,13 +56,13 @@ class PaperWork:
 
     # --- PUBLIC -------------------------------------------------------------------------------------------------------
     def process(self):
-        print("start PaperWork")
+        print("[INFO] start PaperWork")
         # --- 논문 파일 파싱
         for paper in self.papers:
             paper.parse_pdf()
             paper.retrieval_paper()
             # if self.debug: paper.dump()
-        print("read all papers")
+        print(f"[INFO] read all papers : [{len(self.papers)}] papers")
 
         # --- 요약 실행 준비 ---
         sys_msg = self.prompt_schema["roles"]["system"]
@@ -71,7 +71,7 @@ class PaperWork:
         output_parser = StrOutputParser()
 
         fields_block = build_fields_block(self.prompt_schema)
-        print("basic pre-summary complete")
+        print("[INFO] basic pre-summary complete")
 
         # --- 논문별 요약 실행 ---
         for paper in self.papers:
@@ -101,15 +101,10 @@ class PaperWork:
             # if self.debug: print(f"\n{paper.llm_input}\n")
 
             # --- 호출 ---
-            print("call chatgpt")
+            print("[GPT] call chatgpt")
             llm_text = self.__call_openai_chat(sys_msg, user_prompt)
-            paper.final_summary = llm_text
-            print("\tyes")
-
-            if self.debug:
-                pass
-            # parsed = validate_and_normalize(llm_text, self.prompt_schema)
-            # paper.llm_summary = parsed
+            paper.llm_summary_raw = llm_text
+            print(f"[GPT] get response : {paper.llm_summary_raw[0:100]}")
 
     def export(self, output_path: pathlib.Path):
         """
@@ -129,9 +124,8 @@ class PaperWork:
         n_fields = len(header)
 
         # 2) 각 논문 row 생성
-        for paper in self.papers:
-            raw = paper.final_summary
-            raw = raw.strip()
+        for n, paper in enumerate(self.papers):
+            raw = paper.llm_summary_raw.strip()
 
             if not raw:
                 # LLM 결과가 없으면 빈 칸으로 채움 (스키마 길이에 맞춤)
@@ -149,6 +143,10 @@ class PaperWork:
                 row = cols
 
             rows.append(row)
+            paper.final_summary = row
+
+            if self.debug:
+                paper.dump(str(output_path) + f"/{n}.csv")
 
         # 3) CSV 파일로 쓰기
         write_csv(str(output_path) + "/result.csv", rows)

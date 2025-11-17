@@ -151,14 +151,99 @@ class Paper:
             "results_block": results_text,
         }
 
-    def dump(self, preview_chars: int = 160) -> None:
+    def dump(self, output_path: str,
+             include_raw_text: bool, include_chunk: bool, include_asset: bool) -> None:
         """
-        객체의 내용을 덤프하는 기능
+        객체의 내용을 덤프하는 기능.
+
+        - output_path 가 None 이면: 간단한 콘솔용 프리뷰만 출력 (기존 동작 유지)
+        - output_path 가 주어지면: 상세 내용을 txt 파일로 저장
         """
-        print(f"[DEBUG] file = {self.pdf_path.name}, sections = {len(self.chunks)}")
-        for c in self.chunks[:5]:  # 앞부분만 미리보기
-            txt = (c.chunk_text[:preview_chars] + "…") if len(c.chunk_text) > preview_chars else c.chunk_text
-            print(f"  - #{c.chunk_no} ({len(c.chunk_text)} chars): {txt.replace('\\n', ' ')}")
+        output_path = pathlib.Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        lines: list[str] = []
+
+        # --- pdf 경로 ---
+        lines.append("### pdf 경로 ###")
+        lines.append(str(self.pdf_path))
+        lines.append("")
+
+        # --- raw_text ---
+        if include_raw_text:
+            lines.append("raw_text:")
+            if self.raw_text:
+                lines.append(self.raw_text)
+            else:
+                lines.append("[empty]")
+            lines.append("")
+
+        # --- chunks ---
+        if include_chunk:
+            lines.append("chunks:")
+            if not self.chunks:
+                lines.append("[no chunks]")
+            else:
+                for i, c in enumerate(self.chunks):
+                    lines.append(f"{i} - chunk_no={c.chunk_no}")
+                    lines.append("chunk_text:")
+                    # chunk_text 그대로 기록 (줄바꿈 유지)
+                    lines.append(c.chunk_text if c.chunk_text else "[empty]")
+                    lines.append("chunk_indexed:")
+                    # dict -> 문자열
+                    try:
+                        import json
+                        lines.append(json.dumps(c.chunk_indexed, ensure_ascii=False, indent=2))
+                    except Exception:
+                        lines.append(str(c.chunk_indexed))
+                    lines.append("")  # 청크 사이 빈 줄
+
+            lines.append("")
+
+        # --- assets ---
+        if include_asset:
+            lines.append("assets:")
+            if not self.assets:
+                lines.append("[no assets]")
+            else:
+                for i, a in enumerate(self.assets):
+                    lines.append(f"{i} - asset_title: {a.asset_title}")
+                    lines.append("asset_caption:")
+                    lines.append(a.asset_caption if a.asset_caption else "[empty]")
+                    lines.append("asset_data:")
+                    lines.append(str(a.asset_data))
+                    lines.append("")
+
+            lines.append("")
+
+        # --- llm_input ---
+        lines.append("llm_input:")
+        lines.append(self.llm_input if self.llm_input else "[empty]")
+        lines.append("")
+
+        # --- llm_summary_raw (gpt 호출 결과 원문) ---
+        lines.append("llm_summary_raw:")
+        lines.append(self.llm_summary_raw if self.llm_summary_raw else "[empty]")
+        lines.append("")
+
+        # --- final_summary (정규화된 최종 요약이 있다면) ---
+        lines.append("final_summary:")
+        if self.final_summary is None:
+            lines.append("[empty]")
+        else:
+            # dict/list일 수도 있으니 json으로 한 번 정리
+            try:
+                import json
+                lines.append(json.dumps(self.final_summary, ensure_ascii=False, indent=2))
+            except Exception:
+                lines.append(str(self.final_summary))
+        lines.append("")
+
+        # 실제 파일 저장
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+
+        print(f"[DEBUG] Paper dump written to {output_path}")
 
     def export_to_paper(self):
         raise NotImplementedError
