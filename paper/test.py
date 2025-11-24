@@ -7,7 +7,9 @@ def main():
     prompt_path = pathlib.Path("prompt_schema.json")
     output_path = pathlib.Path("./paper_output")
 
-    pw = PaperWork(paper_input, prompt_path, "gpt-5", True)
+    pw = PaperWork(paper_input, prompt_path,
+                   "gpt-5", "text-embedding-3-small",
+                   1)
     pw.process()
     pw.export(output_path)
 

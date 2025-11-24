@@ -1,7 +1,7 @@
 {
   "meta": {
-    "name": "paper_summary_v1",
-    "version": "1.0.0"
+    "name": "paper_summary_v2",
+    "version": "2.0.0"
   },
   "roles": {
     "system": "당신은 논문의 핵심을 정리하는 수준 높은 전문 연구원입니다. 아래 출력 규칙과 스키마를 반드시 준수하십시오.",
@@ -15,9 +15,6 @@
       "- 지정된 최대 개수를 초과하지 말 것.",
       "",
       "# 입력 컨텍스트",
-      "메타데이터:",
-      "{metadata_block}",
-      "",
       "배경/소개(요약):",
       "{intro_block}",
       "",
@@ -32,11 +29,11 @@
     ]
   },
   "fields": [
-    {"key": "제목", "type": "string", "source": "metadata.title"},
-    {"key": "저자", "type": "list",   "source": "metadata.authors", "joiner": ", "},
-    {"key": "게재연도", "type": "string", "source": "metadata.year"},
-    {"key": "학술지", "type": "string", "source": "metadata.journal"},
-    {"key": "키워드", "type": "list", "max_items": 10, "source": "metadata.keywords"},
+    {"key": "제목", "type": "string"},
+    {"key": "저자", "type": "list", "joiner": ", "},
+    {"key": "게재연도", "type": "string"},
+    {"key": "학술지", "type": "string"},
+    {"key": "키워드", "type": "list", "max_items": 10},
     {"key": "정량/정성", "type": "string"},
     {"key": "연구목적", "type": "list", "max_items": 3},
     {"key": "선행연구 한계점", "type": "list", "max_items": 5},
@@ -55,9 +52,17 @@
     "list_item_prefix": "*"
   },
   "context_policy": {
-    "intro_block":  { "sections": ["introduction", "background", "related work"], "top_k": 6, "max_chars": 2500 },
-    "methods_block":{ "sections": ["methods", "methodology", "data"],             "top_k": 8, "max_chars": 3000 },
-    "results_block":{ "sections": ["results", "discussion", "conclusion"],        "top_k": 8, "max_chars": 3000 },
-    "metadata_block": { "from": "metadata", "include": ["title","authors","year","journal","keywords"] }
+    "intro_block": {
+      "query": "Summarize the introduction, background and literature review of the paper.",
+      "max_chars": 2500
+    },
+    "methods_block": {
+      "query": "Summarize the methods, data, and variables used in this research.",
+      "max_chars": 3000
+    },
+    "results_block": {
+      "query": "Summarize the main results, findings and conclusions of the research.",
+      "max_chars": 3000
+    }
   }
 }

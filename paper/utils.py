@@ -11,6 +11,7 @@ class Chunk:
     chunk_no: int        # 청크 일련번호
     chunk_text: str      # 청크 원본텍스트
     chunk_indexed: dict  # 청크 인덱스
+    chunk_embedding: list[float]  # 임베딩 벡터
 
     def score_chunk_by_terms(self, term_weights: dict[str, float]) -> float:
         """
@@ -71,6 +72,67 @@ class Paper:
         picked = [c for c, s in scored[:max(1, top_k)]]
         return picked
 
+    # ------------------- EMBEDDING PRIVATE HELPERS -------------------
+    def __embedding_cache_path(self) -> pathlib.Path:
+        """
+        이 논문에 대한 임베딩 캐시 파일 경로.
+        예: /path/to/paper.pdf -> /path/to/paper.emb.json (동일한 파일명 기반)
+        """
+        pdf_path = pathlib.Path(self.pdf_path)
+        return pdf_path.with_suffix(".emb.json")
+
+    def __load_embeddings_from_json(self, expected_model: str) -> bool:
+        """
+        JSON 캐시에서 임베딩을 불러와 self.chunks[*].chunk_embedding 에 주입.
+        - expected_model 이 다르면 False 반환 (재계산 유도)
+        - 청크 개수가 다르면 False
+        """
+        cache_path = self.__embedding_cache_path()
+        if not cache_path.exists():
+            return False
+
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return False
+
+        if data.get("model") != expected_model:
+            return False
+
+        emb_list = data.get("chunk_embeddings", [])
+        if len(emb_list) != len(self.chunks):
+            return False
+
+        # 로드 성공 → 청크에 임베딩 주입
+        for chunk, emb in zip(self.chunks, emb_list):
+            chunk.chunk_embedding = emb
+
+        return True
+
+    def __save_embeddings_to_json(self, model_name: str) -> None:
+        """
+        현재 self.chunks[*].chunk_embedding 을 JSON으로 저장.
+        """
+        cache_path = self.__embedding_cache_path()
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+        emb_list: list[list[float]] = []
+        for c in self.chunks:
+            if c.chunk_embedding is None:
+                raise RuntimeError("임베딩이 없는 청크가 있어 저장할 수 없습니다.")
+            emb_list.append(c.chunk_embedding)
+
+        payload = {
+            "version": 1,
+            "model": model_name,
+            "num_chunks": len(self.chunks),
+            "chunk_embeddings": emb_list,
+        }
+
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+
     # --- PUBLIC -------------------------------------------------------------------------------------------------------
     def parse_pdf(self, chunk_chars: int = 2500, overlap_chars: int = 300) -> None:
         """
@@ -93,9 +155,27 @@ class Paper:
         step = chunk_chars - overlap_chars  # 시작점 = 한 청크당 글자수 - 오버랩 글자수
         while start < text_length:
             end = min(start + chunk_chars, text_length)
-            self.chunks.append(Chunk(i, self.raw_text[start:end], dict()))
+            self.chunks.append(Chunk(i, self.raw_text[start:end], dict(), list()))
             start += step
             i += 1
+
+    def prepare_embeddings(self, llm_create_embeddings, model_name: str, force_recompute=False) -> None:
+        """
+        임베딩 전처리 진입함수.
+        :param llm_create_embeddings: 임베딩 호출용 PaperWork.__llm_create_embeddings() 메서드
+        :param model_name: 사용한 임베딩 모델명 (캐시에 기록/검증용)
+        :param force_recompute: True 면 캐시 무시하고 항상 재계산
+        """
+        # 1) 강제로 업데이트 해야하거나, 이미 계산해둔 데이터가 있다면 넘어감
+        if not force_recompute and self.__load_embeddings_from_json(model_name):
+            return
+
+        # 2) 강제로 또는 없어서 새로 계산
+        for chunk, emb in zip(self.chunks, llm_create_embeddings([c.chunk_text for c in self.chunks])):
+            chunk.chunk_embedding = emb
+
+        # 3) JSON으로 저장
+        self.__save_embeddings_to_json(model_name)
 
     def retrieval_paper(self) -> None:
         """
@@ -151,8 +231,67 @@ class Paper:
             "results_block": results_text,
         }
 
+    def build_context_blocks_from_embedding(self, schema: dict, llm_create_quary_embedding) -> dict:
+        """
+        context_policy 의 각 블록에 대해:
+        - query 텍스트를 임베딩
+        - 청크 임베딩과 코사인 유사도 계산
+        - 유사도 순으로 정렬한 청크들을 max_chars 제한까지 join
+        """
+        cp = schema.get("context_policy", {})
+
+        # 간단 코사인 유사도 함수
+        def cosine(a: list[float], b: list[float]) -> float:
+            if a is None or b is None:
+                return -1.0
+            # 안전장치
+            if len(a) != len(b):
+                return -1.0
+            dot = 0.0
+            na = 0.0
+            nb = 0.0
+            for x, y in zip(a, b):
+                dot += x * y
+                na += x * x
+                nb += y * y
+            if na == 0.0 or nb == 0.0:
+                return -1.0
+            import math
+            return dot / (math.sqrt(na) * math.sqrt(nb))
+
+        blocks: dict[str, str] = {}
+
+        for block_name, cfg in cp.items():
+            query_text = cfg.get("query", "").strip()
+            max_chars = int(cfg.get("max_chars", 3000))
+
+            if not query_text or max_chars <= 0:
+                blocks[block_name] = ""
+                continue
+
+            # 1) 쿼리 임베딩 계산
+            q_emb = llm_create_quary_embedding(query_text)
+
+            # 2) 청크별 유사도
+            scored: list[tuple[Chunk, float]] = []
+            for c in self.chunks:
+                if c.chunk_embedding is None:
+                    continue
+                s = cosine(q_emb, c.chunk_embedding)
+                scored.append((c, s))
+
+            # 3) 유사도 순 정렬
+            scored.sort(key=lambda x: x[1], reverse=True)
+            sorted_chunks = [c for c, s in scored]
+
+            # 4) 기존 join 로직 재사용 (문자수 제한)
+            block_text = self.__join_chunks_with_limit(sorted_chunks, max_chars)
+            blocks[block_name] = block_text
+
+        return blocks
+
     def dump(self, output_path: str,
-             include_raw_text: bool, include_chunk: bool, include_asset: bool) -> None:
+             include_raw_text=True, include_chunk=True, include_asset=True) -> None:
         """
         객체의 내용을 덤프하는 기능.
 
@@ -299,31 +438,17 @@ def format_list_inline(items: list[str], prefix: str) -> str:
     return " ".join([f"{prefix}{s}" for s in line])
 
 
-def assemble_user_prompt(*, user_template_lines: list[str], fields_block: str, schema: dict, rag_context: dict) -> str:
+def assemble_user_prompt(*, user_template_lines: list[str], fields_block: str,
+                         schema: dict, rag_context: dict,) -> str:
     """
     prompt_schema.json의 user_template(list[str])에 rag_context를 채워 넣어 최종 문자열로 변환
     """
-    # 메타 블록은 key: value 줄바꿈 나열
-    meta = rag_context.get("metadata", {}) or {}
-    meta_lines = []
-    include_list = schema.get("context_policy", {}).get("metadata_block", {}).get("include", [])
-    if include_list:
-        for k in include_list:
-            v = meta.get(k, "n/a")
-            # authors, keywords가 리스트면 join
-            if isinstance(v, list):
-                v = ", ".join(v) if v else "n/a"
-            meta_lines.append(f"- {k}: {v}")
-    metadata_block = "\n".join(meta_lines) if meta_lines else "n/a"
-
-    # 필드 헤더
     fields_block_text = fields_block
 
     _fmt = {
-        "metadata_block": metadata_block,
         "intro_block": rag_context.get("intro_block", ""),
         "methods_block": rag_context.get("methods_block", ""),
         "results_block": rag_context.get("results_block", ""),
-        "fields_block": fields_block_text
+        "fields_block": fields_block_text,
     }
     return "\n".join(user_template_lines).format(**_fmt)

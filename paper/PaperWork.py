@@ -1,6 +1,6 @@
 from utils import *
 from langchain_core.output_parsers import StrOutputParser
-from openai import OpenAI
+from openai import OpenAI, embeddings
 import pathlib
 import time
 
@@ -11,19 +11,22 @@ class PaperWork:
     debug: bool
     temp_path: str
 
-    def __init__(self, pdf_master_path: pathlib.Path, prompt_path: pathlib.Path, llm_model_name, debug=False, temp_dir=".temp"):
+    def __init__(self, pdf_master_path: pathlib.Path, prompt_path: pathlib.Path, llm_model_name, embedding_model_name,
+                 temperature=0.0, debug=False, temp_dir=".temp"):
         self.debug = debug
         self.temp_path = temp_dir
         self.prompt_schema = load_prompt_schema(prompt_path)
         self.papers = load_paper(pdf_master_path)
 
         # llm setting
+        self.temperature = temperature
         self.llm_model_name = llm_model_name
+        self.embedding_model_name = embedding_model_name
         self.max_retries: int = 3
         self.request_timeout_sec: int = 120
 
     # --- PRIVATE ------------------------------------------------------------------------------------------------------
-    def __call_openai_chat(self, system_msg: str, user_msg: str) -> str:
+    def __llm_summarize(self, system_msg: str, user_msg: str) -> str:
         """
         system/user 메시지로 OpenAI Chat API 호출하여 텍스트를 반환.
         """
@@ -33,7 +36,6 @@ class PaperWork:
         ]
 
         client = OpenAI()
-        last_err = None
         for attempt in range(1, self.max_retries + 1):
             try:
                 # Chat Completions 스타일
@@ -41,18 +43,42 @@ class PaperWork:
                     model=self.llm_model_name,
                     messages=messages,
                     timeout=self.request_timeout_sec,
+                    temperature=self.temperature
                 )
                 text = resp.choices[0].message.content or ""
                 return text.strip()
 
             except Exception as e:
-                last_err = e
                 if attempt < self.max_retries:
                     # 간단한 지수 백오프
                     time.sleep(1.5 * attempt)
                 else:
                     raise e
         return ""
+
+    def __llm_create_embeddings(self, input_texts: list[str]) -> list[list[float]]:
+        """
+        인베딩 호출하여 생성
+        """
+        client = OpenAI()
+
+        resp = client.embeddings.create(
+            model=self.embedding_model_name,
+            input=input_texts,
+        )
+        return [d.embedding for d in resp.data]
+
+    def __llm_create_quary_embedding(self, input_text: str) -> list[float]:
+        """
+        임베딩 질문 문구를 임베딩함
+        """
+        client = OpenAI()
+
+        resp = client.embeddings.create(
+            model=self.embedding_model_name,
+            input=[input_text],
+        )
+        return resp.data[0].embedding
 
     # --- PUBLIC -------------------------------------------------------------------------------------------------------
     def process(self):
@@ -61,48 +87,40 @@ class PaperWork:
         for paper in self.papers:
             paper.parse_pdf()
             paper.retrieval_paper()
-            # if self.debug: paper.dump()
+            paper.prepare_embeddings(self.__llm_create_embeddings, self.embedding_model_name)
         print(f"[INFO] read all papers : [{len(self.papers)}] papers")
 
-        # --- 요약 실행 준비 ---
+        # --- 요약 실행 준비
         sys_msg = self.prompt_schema["roles"]["system"]
         user_template_lines = self.prompt_schema["roles"]["user_template"]
-
-        output_parser = StrOutputParser()
 
         fields_block = build_fields_block(self.prompt_schema)
         print("[INFO] basic pre-summary complete")
 
-        # --- 논문별 요약 실행 ---
+        # --- 논문별 요약 실행
         for paper in self.papers:
-            # - 자료준비 -
-            blocks = paper.build_context_blocks_from_freq(self.prompt_schema)
+            # - 자료준비
+            blocks = paper.build_context_blocks_from_embedding(self.prompt_schema,
+                                                               self.__llm_create_quary_embedding)
 
             rag_context = {
-                "metadata": {
-                    "title": "알 수 없음",
-                    "authors": [],
-                    "year": "알 수 없음",
-                    "journal": "알 수 없음",
-                    "keywords": []
-                },
-                "intro_block": blocks["intro_block"],
-                "methods_block": blocks["methods_block"],
-                "results_block": blocks["results_block"],
+                "intro_block": blocks.get("intro_block", ""),
+                "methods_block": blocks.get("methods_block", ""),
+                "results_block": blocks.get("results_block", ""),
             }
             user_prompt = assemble_user_prompt(
                 user_template_lines=user_template_lines,
                 fields_block=fields_block,
                 schema=self.prompt_schema,
-                rag_context=rag_context
+                rag_context=rag_context,
             )
             paper.llm_input = f"{sys_msg}\n\n{user_prompt}"
 
             # if self.debug: print(f"\n{paper.llm_input}\n")
 
-            # --- 호출 ---
+            # - 호출
             print("[GPT] call chatgpt")
-            llm_text = self.__call_openai_chat(sys_msg, user_prompt)
+            llm_text = self.__llm_summarize(sys_msg, user_prompt)
             paper.llm_summary_raw = llm_text
             print(f"[GPT] get response : {paper.llm_summary_raw[0:100]}")
 
