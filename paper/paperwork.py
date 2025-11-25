@@ -17,6 +17,10 @@ class PrePaperWork:
         self.user_prompt: str = ""
         self.system_prompt: str = ""
 
+        self.temperature: float = 1.0
+        self.max_retries: int = 3
+        self.request_timeout_sec: int = 60
+
     # --- PRIVATE ------------------------------------------------------------------------------------------------------
     def __read_ris(self) -> None:
         """
@@ -80,18 +84,74 @@ class PrePaperWork:
         llm deside either paper will accept as screening or not accept, with a reason
         :return: is responce correct?
         """
+        client = OpenAI()
 
-        # <답변 호출 로직 과정 / self.model_name 및 self.prompt 사용, 기타설정은 로컬 고정 설정.>
+        user_msg = self.user_prompt.format(
+            title=paper.texts.get("title", "N/A"),
+            abstract=paper.texts.get("abstract", "N/A"),
+            questions=self.questions)
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
 
-        responce = "수용여부(Y/N),배제사유키워드,배제사유전체".split(",")  # 답변 구조 예시
-        if len(responce) < 3:
-            print("[INFO] llm call failed")
+        content: str = ""
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                resp = client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=self.temperature,
+                    timeout=self.request_timeout_sec,
+                )
+                content = (resp.choices[0].message.content or "").strip()
+                break
+            except Exception as e:
+                print(f"[WARN] llm_quary attempt {attempt} failed: {e}")
+                if attempt < self.max_retries:
+                    time.sleep(1.5 * attempt)
+                    continue
+                else:
+                    # 더 이상 재시도하지 않음 → process()에서 while not __llm_quary 로 다시 한 바퀴
+                    return False
+
+        if not content:
+            print("[INFO] llm_quary: empty response")
             return False
-        if responce[0] == "Y":  # 수용여부
+
+        first_line = ""
+        for ln in content.splitlines():
+            ln = ln.strip()
+            if ln:
+                first_line = ln
+                break
+
+        if not first_line:
+            print("[INFO] llm_quary: no non-empty line in response")
+            return False
+
+        parts = [p.strip() for p in first_line.split(",", 2)]
+        if len(parts) < 3:
+            print(f"[INFO] llm_quary: malformed csv line: {first_line}")
+            return False
+
+        yn, keyword, reason = parts[0], parts[1], parts[2]
+        yn = yn.upper()
+
+        if yn not in ("Y", "N"):
+            print(f"[INFO] llm_quary: first field is not Y/N: {yn}")
+            return False
+
+        # 5) PrePaper에 결과 기록
+        if yn == "Y":
             paper.accept = True
-            return True
-        paper.reject_keyword = responce[1]
-        paper.reject_reason = responce[2]
+            paper.reject_keyword = "N/A"
+            paper.reject_reason = "N/A"
+        else:
+            paper.accept = False
+            paper.reject_keyword = keyword or "N/A"
+            paper.reject_reason = reason or "N/A"
+
         return True
 
     def __find_same_paper(self) -> None:
