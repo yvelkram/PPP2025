@@ -27,7 +27,7 @@ class Chunk:
 class Asset:
     asset_title: str    # 에셋 명 (Fig. 1)
     asset_caption: str  # 에셋 캡션
-    asset_data: any     # 에셋 데이터 위치
+    asset_data: str     # 에셋 데이터 위치
 
 
 # --- PAPER MODULE -----------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ class FullPaper:
 
         self.llm_input: str = ""
         self.llm_summary_raw: str = ""
-        self.final_summary: any = None  # 콤마로 구분된 최종 요약물
+        self.final_summary: list[str] = []  # 콤마로 구분된 최종 요약물
 
     # --- PRIVATE ------------------------------------------------------------------------------------------------------
     @staticmethod

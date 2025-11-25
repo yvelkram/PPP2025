@@ -7,13 +7,15 @@ import time
 
 # --- PAPERWORK MODULE -------------------------------------------------------------------------------------------------
 class PrePaperWork:
-    def __init__(self, ris_path: str, questions: str, model_name: str = "gpt-5"):
+    def __init__(self, ris_path: str, prompt_path: str, questions: str, model_name: str = "gpt-5"):
         self.ris_path: str = ris_path
+        self.prompt_path = prompt_path
         self.questions: str = questions
         self.model_name = model_name
 
         self.papers: list[PrePaper] = []
-        self.prompt: str = ""
+        self.user_prompt: str = ""
+        self.system_prompt: str = ""
 
     # --- PRIVATE ------------------------------------------------------------------------------------------------------
     def __read_ris(self) -> None:
@@ -22,49 +24,56 @@ class PrePaperWork:
         """
         encoding = "utf-8"
         try:
-            open(self.ris_path, encoding=encoding)
+            open(self.ris_path, encoding=encoding).close()
         except UnicodeDecodeError:
             encoding = "cp949"
 
-        texts = {"title": "N/A",
+        structure = {"title": "N/A",
                  "abstract": "N/A",
                  "doi": "N/A",
                  "database": "N/A",
                  "publish_year": "N/A",
                  "author": "N/A",
                  "keyword": "N/A"}
-        for ln in open(self.ris_path, encoding=encoding).readlines():
+        current = structure.copy()
+        with open(self.ris_path, encoding=encoding) as f:
+            raw_texts = f.readlines()
+        for ln in raw_texts:
             if ln.startswith("TI"):  # title
-                texts["title"] = ln[6:-1]
+                current["title"] = ln[6:-1]
             elif ln.startswith("AB"):  # abstract
-                texts["abstract"] = ln[6:-1]
+                current["abstract"] = ln[6:-1]
             elif ln.startswith("DO"):  # DOI
-                texts["doi"] = ln[6:-1]
+                current["doi"] = ln[6:-1]
             elif ln.startswith("DB"):  # database
-                texts["database"] = ln[6:-1]
+                current["database"] = ln[6:-1]
             elif ln.startswith("PY"):  # publish_year
-                texts["publish_year"] = ln[6:-1]
+                current["publish_year"] = ln[6:-1]
 
             elif ln.startswith("AU"):  # author
-                if texts["author"] != "N/A":  # if there is multiple authors, combine with comma
-                    texts["author"] += f"#{ln[6:-1]}"
+                if current["author"] != "N/A":  # if there is multiple authors, combine with |
+                    current["author"] += f"|{ln[6:-1]}"
                 else:
-                    texts["author"] = ln[6:-1]
+                    current["author"] = ln[6:-1]
             elif ln.startswith("KW"):  # keyword
-                if texts["keyword"] != "N/A":  # if there is multiple keywords, combine with comma
-                    texts["keyword"] += f"#{ln[6:-1]}"
+                if current["keyword"] != "N/A":  # if there is multiple keywords, combine with |
+                    current["keyword"] += f"|{ln[6:-1]}"
                 else:
-                    texts["keyword"] = ln[6:-1]
+                    current["keyword"] = ln[6:-1]
 
-            elif ln == "\n":
-                self.papers.append(PrePaper(texts))
+            elif ln.startswith("ER"):  # last record
+                self.papers.append(PrePaper(current))
+                current = structure.copy()  # need to init again for deep copy
 
     def __construct_prompt(self) -> None:
         """
         read prework_prompt_schema.json and self.questions to make final prompt
         """
+        schema = load_prompt_schema(self.prompt_path)
+        roles = schema["roles"]
 
-        # self.prompt를 조립하여 완성
+        self.system_prompt = "\n".join(roles["system"])
+        self.user_prompt = "\n".join(roles["user_template"])
 
     def __llm_quary(self, paper: PrePaper) -> bool:
         """
@@ -135,7 +144,7 @@ class FullPaperWork:
     debug: bool
     temp_path: str
 
-    def __init__(self, pdf_master_path: pathlib.Path, prompt_path: pathlib.Path, llm_model_name, embedding_model_name,
+    def __init__(self, pdf_master_path: str, prompt_path: str, llm_model_name, embedding_model_name,
                  temperature=0.0, debug=False, temp_dir=".temp"):
         self.debug = debug
         self.temp_path = temp_dir
@@ -295,6 +304,3 @@ class FullPaperWork:
 
         if self.debug:
             print(f"[DEBUG] exported {len(self.papers)} papers to {output_path}")
-
-
-

@@ -4,7 +4,7 @@ import pathlib
 from paper import FullPaper
 
 # --- COMMON FEATURES --------------------------------------------------------------------------------------------------
-def load_prompt_schema(prompt_path: pathlib.Path) -> dict:
+def load_prompt_schema(prompt_path: str) -> dict:
     """
     프롬프트 불러오기 (json 양식)
     :param prompt_path: 파일 경로
@@ -14,13 +14,13 @@ def load_prompt_schema(prompt_path: pathlib.Path) -> dict:
         return json.load(f)
 
 
-def load_paper(pdf_master_path: pathlib.Path) -> list[FullPaper]:
+def load_paper(pdf_master_path: str) -> list[FullPaper]:
     """
     주어진 폴더의 파일들을 불러오는 함수
     :param pdf_master_path: 주어진 폴더
     :return: 논문 객체
     """
-    pdf_files = sorted(pdf_master_path.glob("*.pdf"))
+    pdf_files = sorted(pathlib.Path(pdf_master_path).glob("*.pdf"))
 
     return [FullPaper(pdf) for pdf in pdf_files]
 
