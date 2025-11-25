@@ -1,11 +1,135 @@
 from utils import *
-from langchain_core.output_parsers import StrOutputParser
-from openai import OpenAI, embeddings
+from paper import *
+from openai import OpenAI
 import pathlib
 import time
 
-class PaperWork:
-    papers: list[Paper]
+
+# --- PAPERWORK MODULE -------------------------------------------------------------------------------------------------
+class PrePaperWork:
+    def __init__(self, ris_path: str, questions: str, model_name: str = "gpt-5"):
+        self.ris_path: str = ris_path
+        self.questions: str = questions
+        self.model_name = model_name
+
+        self.papers: list[PrePaper] = []
+        self.prompt: str = ""
+
+    # --- PRIVATE ------------------------------------------------------------------------------------------------------
+    def __read_ris(self) -> None:
+        """
+        Read ris file and add PrePaper object.
+        """
+        encoding = "utf-8"
+        try:
+            open(self.ris_path, encoding=encoding)
+        except UnicodeDecodeError:
+            encoding = "cp949"
+
+        texts = {"title": "N/A",
+                 "abstract": "N/A",
+                 "doi": "N/A",
+                 "database": "N/A",
+                 "publish_year": "N/A",
+                 "author": "N/A",
+                 "keyword": "N/A"}
+        for ln in open(self.ris_path, encoding=encoding).readlines():
+            if ln.startswith("TI"):  # title
+                texts["title"] = ln[6:-1]
+            elif ln.startswith("AB"):  # abstract
+                texts["abstract"] = ln[6:-1]
+            elif ln.startswith("DO"):  # DOI
+                texts["doi"] = ln[6:-1]
+            elif ln.startswith("DB"):  # database
+                texts["database"] = ln[6:-1]
+            elif ln.startswith("PY"):  # publish_year
+                texts["publish_year"] = ln[6:-1]
+
+            elif ln.startswith("AU"):  # author
+                if texts["author"] != "N/A":  # if there is multiple authors, combine with comma
+                    texts["author"] += f"#{ln[6:-1]}"
+                else:
+                    texts["author"] = ln[6:-1]
+            elif ln.startswith("KW"):  # keyword
+                if texts["keyword"] != "N/A":  # if there is multiple keywords, combine with comma
+                    texts["keyword"] += f"#{ln[6:-1]}"
+                else:
+                    texts["keyword"] = ln[6:-1]
+
+            elif ln == "\n":
+                self.papers.append(PrePaper(texts))
+
+    def __construct_prompt(self) -> None:
+        """
+        read prework_prompt_schema.json and self.questions to make final prompt
+        """
+
+        # self.prompt를 조립하여 완성
+
+    def __llm_quary(self, paper: PrePaper) -> bool:
+        """
+        llm deside either paper will accept as screening or not accept, with a reason
+        :return: is responce correct?
+        """
+
+        # <답변 호출 로직 과정 / self.model_name 및 self.prompt 사용, 기타설정은 로컬 고정 설정.>
+
+        responce = "수용여부(Y/N),배제사유키워드,배제사유전체".split(",")  # 답변 구조 예시
+        if len(responce) < 3:
+            print("[INFO] llm call failed")
+            return False
+        if responce[0] == "Y":  # 수용여부
+            paper.accept = True
+            return True
+        paper.reject_keyword = responce[1]
+        paper.reject_reason = responce[2]
+        return True
+
+    def __find_same_paper(self) -> None:
+        """
+        Find duplicated paper by PrePaper.texts[doi] value and mark PrePaper.duplicated to True
+        """
+
+        # doi로 중복 논문 찾아서, 중복시 변수로 플래그 세움
+
+    # --- PUBLIC -------------------------------------------------------------------------------------------------------
+    def process(self):
+        print("[INFO] start ris reading")
+        self.__read_ris()
+        print("[INFO] search duplicated paper")
+        self.__find_same_paper()
+        print("[INFO] make final prompt")
+        self.__construct_prompt()
+
+        print("[INFO] start paper summary")
+        for paper in self.papers:
+            if paper.duplicated:  # don't quary duplicated paper
+                continue
+            while not self.__llm_quary(paper):
+                continue
+
+    def export(self, output_path: str):
+        print("[INFO] make output.csv")
+        """
+        id | DOI | 저자 | 연도 | 제목 | 데이터베이스 | 검토자1 | 검토자2 | 검토일 | 중복여부 | 포함여부 | 배제사유키워드 | 배제사유내용 | 다음단계여부 
+        1 | PrePaper.texts["doi"] | "author" | "publish_year" | "title" | "database" | 공백 | 공백 | 공백 | PrePaper.duplicated | PrePaper.accept | PrePaper.reject_keyword | PrePaper.reject_reason | accept면 진행, 아니면 배제    
+        2 | 위와 동일하게 연장
+        ...
+        """
+
+        print("[INFO] make summary.csv")
+        """
+        항목 | 검색된 총건수 | 중복 제거 후건수 | 제목·초록검토 대상건수 | 제목·초록 단계 배제건수 | 제목·초록 후 전문검토 대상건수 | 전문검토 후 최종 포함건수 | 전문단계 배제건수 | 비고
+        숫자 | len(self.papers) | PrePaper.duplicated로 판단 | PrePaper.duplicated로 판단 | PrePaper.duplicated로 판단 | PrePaper.accept로 판단 | 공백 | 공백 | 공백
+        """
+
+        print("[INFO] make paper dump")
+        for paper in self.papers:
+            paper.dump()
+
+
+class FullPaperWork:
+    papers: list[FullPaper]
     prompt_schema: dict
     llm_model_name: str
     debug: bool
@@ -171,4 +295,6 @@ class PaperWork:
 
         if self.debug:
             print(f"[DEBUG] exported {len(self.papers)} papers to {output_path}")
+
+
 
