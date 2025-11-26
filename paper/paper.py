@@ -31,19 +31,13 @@ class Asset:
 
 
 # --- PAPER MODULE -----------------------------------------------------------------------------------------------------
+@dataclass
 class PrePaper:
-    def __init__(self, parsed: dict):
-        self.texts: dict = parsed  # ris data
-        self.accept: bool = False  # accept for screening?
-        self.duplicated: bool = False  # is this duplicated?
-        self.reject_keyword: str = "N/A"
-        self.reject_reason: str = "N/A"
-
-    # --- PRIVATE ------------------------------------------------------------------------------------------------------
-
-    # --- PUBLIC -------------------------------------------------------------------------------------------------------
-    def dump(self):
-        pass
+    texts: dict                 # ris data
+    accept: bool = False        # accept for screening?
+    duplicated: bool = False    # is duplicated?
+    reject_keyword: str = "N/A"
+    reject_reason: str = "N/A"
 
 
 class FullPaper:

@@ -1,7 +1,7 @@
 from utils import *
-from paper import *
+from paper import PrePaper, FullPaper
 from openai import OpenAI
-import pathlib
+
 import time
 
 
@@ -66,8 +66,11 @@ class PrePaperWork:
                     current["keyword"] = ln[6:-1]
 
             elif ln.startswith("ER"):  # last record
-                self.papers.append(PrePaper(current))
+                self.papers.append(PrePaper(current))  # 1st variable = PrePaper.texts
                 current = structure.copy()  # need to init again for deep copy
+
+            if len(self.papers) > 5:
+                break
 
     def __construct_prompt(self) -> None:
         """
@@ -158,11 +161,28 @@ class PrePaperWork:
         """
         Find duplicated paper by PrePaper.texts[doi] value and mark PrePaper.duplicated to True
         """
+        doi_map: dict[str, PrePaper] = {}
+        dup_count = 0
 
-        # doi로 중복 논문 찾아서, 중복시 변수로 플래그 세움
+        for paper in self.papers:
+            doi = paper.texts["doi"]
+            if doi == "N/A":  # dismiss default value : unknown for decide duplicated
+                continue
+            if doi in doi_map:  # duplicated
+                paper.duplicated = True
+                dup_count += 1
+            else:  # not duplicated
+                paper.duplicated = False
+                doi_map[doi] = paper
+        print(f"[INFO] find_same_paper: " +
+              f"unique papers = [{len(doi_map)}], " +
+              f"duplicated papers = [{dup_count}]")
 
     # --- PUBLIC -------------------------------------------------------------------------------------------------------
-    def process(self):
+    def process(self) -> None:
+        """
+        main process
+        """
         print("[INFO] start ris reading")
         self.__read_ris()
         print("[INFO] search duplicated paper")
@@ -177,24 +197,53 @@ class PrePaperWork:
             while not self.__llm_quary(paper):
                 continue
 
-    def export(self, output_path: str):
+    def export(self, output_path: str) -> None:
+        """
+        export screening result
+        :param output_path:
+        """
+        # --- 1. output.csv
         print("[INFO] make output.csv")
-        """
-        id | DOI | 저자 | 연도 | 제목 | 데이터베이스 | 검토자1 | 검토자2 | 검토일 | 중복여부 | 포함여부 | 배제사유키워드 | 배제사유내용 | 다음단계여부 
-        1 | PrePaper.texts["doi"] | "author" | "publish_year" | "title" | "database" | 공백 | 공백 | 공백 | PrePaper.duplicated | PrePaper.accept | PrePaper.reject_keyword | PrePaper.reject_reason | accept면 진행, 아니면 배제    
-        2 | 위와 동일하게 연장
-        ...
-        """
+        header = ["fid",
+                  "DOI", "저자", "연도", "제목", "데이터베이스",
+                  "검토자1", "검토자2", "마지막검토일",
+                  "중복여부", "포함여부", "배제사유키워드", "배제사유내용", "다음단계여부"]
+        output_rows: list[list[str]] = [header]
+        for idx, paper in enumerate(self.papers, start=1):
+            text_duplicated = "Y" if paper.duplicated else "N"
+            text_accept = "Y" if paper.accept else "N"
+            text_next_step = "진행" if paper.accept else "배제"
+            row = [str(idx),
+                   paper.texts["doi"], paper.texts["author"], paper.texts["publish_year"], paper.texts["title"], paper.texts["database"],
+                   "", "", "",  #검토자1, 검토자2, 마지막검토일
+                   text_duplicated, text_accept, paper.reject_keyword, paper.reject_reason, text_next_step]
+            output_rows.append(row)
+        write_csv(output_path + "/output.csv", output_rows)
 
+        # --- 2. summary.csv
         print("[INFO] make summary.csv")
-        """
-        항목 | 검색된 총건수 | 중복 제거 후건수 | 제목·초록검토 대상건수 | 제목·초록 단계 배제건수 | 제목·초록 후 전문검토 대상건수 | 전문검토 후 최종 포함건수 | 전문단계 배제건수 | 비고
-        숫자 | len(self.papers) | PrePaper.duplicated로 판단 | PrePaper.duplicated로 판단 | PrePaper.duplicated로 판단 | PrePaper.accept로 판단 | 공백 | 공백 | 공백
-        """
 
-        print("[INFO] make paper dump")
-        for paper in self.papers:
-            paper.dump()
+        total_count = len(self.papers)
+        unique_count = sum(1 for paper in self.papers
+                           if not paper.duplicated)
+
+        screening_target_count = unique_count
+        screening_reject_count = sum(1 for paper in self.papers
+                                     if (not paper.duplicated) and (not paper.accept))
+        screening_pass_count = sum(1 for paper in self.papers
+                                   if (not paper.duplicated) and paper.accept)
+
+        summary_rows = [
+            ["구분","논문숫자"],
+            ["검색된 총건수",f"{total_count}"],
+            ["중복 제거 후건수",f"{unique_count}"],
+            ["제목·초록검토 대상건수",f"{screening_target_count}"],
+            ["제목·초록 단계 배제건수",f"{screening_reject_count}"],
+            ["제목·초록 후 전문검토 대상건수",f"{screening_pass_count}"],
+            ["전문검토 후 최종 포함건수",""],
+            ["전문단계 배제건수",""],
+            ["비고",""]]
+        write_csv(output_path + "/summary.csv", summary_rows)
 
 
 class FullPaperWork:
@@ -317,7 +366,7 @@ class FullPaperWork:
             paper.llm_summary_raw = llm_text
             print(f"[GPT] get response : {paper.llm_summary_raw[0:100]}")
 
-    def export(self, output_path: pathlib.Path):
+    def export(self, output_path: str):
         """
         LLM 요약 결과를 하나의 CSV 파일로 내보내는 함수.
 
