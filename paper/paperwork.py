@@ -1,15 +1,19 @@
 from utils import *
 from paper import PrePaper, FullPaper
+
 from openai import OpenAI
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import time
 
 
 # --- PAPERWORK MODULE -------------------------------------------------------------------------------------------------
 class PrePaperWork:
-    def __init__(self, ris_path: str, prompt_path: str, questions: str, model_name: str = "gpt-5"):
-        self.ris_path: str = ris_path
+    def __init__(self, ris_path: list[str], prompt_path: str, output_path: str,
+                 questions: str, model_name: str = "gpt-5"):
+        self.ris_paths: list[str] = ris_path
         self.prompt_path = prompt_path
+        self.output_path = output_path
         self.questions: str = questions
         self.model_name = model_name
 
@@ -17,20 +21,24 @@ class PrePaperWork:
         self.user_prompt: str = ""
         self.system_prompt: str = ""
 
-        self.temperature: float = 1.0
+        self.temperature: float = 1.0       # other value is not working
         self.max_retries: int = 3
-        self.request_timeout_sec: int = 60
+        self.request_timeout_sec: int = 60  # llm request max time wait
+        self.max_workers: int = 5           # maximum async worker
 
     # --- PRIVATE ------------------------------------------------------------------------------------------------------
-    def __read_ris(self) -> None:
+    def __read_ris(self, ris_file: str) -> None:
         """
         Read ris file and add PrePaper object.
         """
         encoding = "utf-8"
         try:
-            open(self.ris_path, encoding=encoding).close()
+            open(ris_file, encoding=encoding).close()
         except UnicodeDecodeError:
             encoding = "cp949"
+        except FileNotFoundError:
+            print(f"[ERROR] invalid or empty file path : [{ris_file}]")
+            return
 
         structure = {"title": "N/A",
                  "abstract": "N/A",
@@ -40,7 +48,7 @@ class PrePaperWork:
                  "author": "N/A",
                  "keyword": "N/A"}
         current = structure.copy()
-        with open(self.ris_path, encoding=encoding) as f:
+        with open(ris_file, encoding=encoding) as f:
             raw_texts = f.readlines()
         for ln in raw_texts:
             if ln.startswith("TI"):  # title
@@ -68,9 +76,6 @@ class PrePaperWork:
             elif ln.startswith("ER"):  # last record
                 self.papers.append(PrePaper(current))  # 1st variable = PrePaper.texts
                 current = structure.copy()  # need to init again for deep copy
-
-            if len(self.papers) > 5:
-                break
 
     def __construct_prompt(self) -> None:
         """
@@ -184,23 +189,58 @@ class PrePaperWork:
         main process
         """
         print("[INFO] start ris reading")
-        self.__read_ris()
+        for ris_file in self.ris_paths:
+            self.__read_ris(ris_file)
         print("[INFO] search duplicated paper")
         self.__find_same_paper()
         print("[INFO] make final prompt")
         self.__construct_prompt()
 
         print("[INFO] start paper summary")
+        counter = 1
         for paper in self.papers:
             if paper.duplicated:  # don't quary duplicated paper
                 continue
             while not self.__llm_quary(paper):
                 continue
 
-    def export(self, output_path: str) -> None:
+            print(f"{counter}/{len(self.papers)} ({100*counter/len(self.papers):0.2f}%) papers done")
+            counter += 1
+
+            if counter % 100 == 0:
+                self.export()
+
+    def process_parallel(self, max_workers: int = 3) -> None:
+        print("[INFO] start ris reading")
+        for ris_file in self.ris_paths:
+            self.__read_ris(ris_file)
+        print("[INFO] search duplicated paper")
+        self.__find_same_paper()
+        print("[INFO] make final prompt")
+        self.__construct_prompt()
+
+        print("[INFO] start paper screening (parallel)")
+
+        def worker(paper: PrePaper) -> None:
+            if paper.duplicated:
+                return
+            while not self.__llm_quary(paper):
+                continue
+
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            futures = [ex.submit(worker, p)
+                       for p in self.papers
+                       if not p.duplicated]
+            for i, f in enumerate(as_completed(futures), start=1):
+                try:
+                    f.result()
+                    print(f"[INFO] {i}/{len(futures)} ({100*i/len(self.papers):0.2f}%) papers done")
+                except Exception as e:
+                    print(f"[WARN] worker failed: {e}")
+
+    def export(self) -> None:
         """
         export screening result
-        :param output_path:
         """
         # --- 1. output.csv
         print("[INFO] make output.csv")
@@ -218,7 +258,7 @@ class PrePaperWork:
                    "", "", "",  #검토자1, 검토자2, 마지막검토일
                    text_duplicated, text_accept, paper.reject_keyword, paper.reject_reason, text_next_step]
             output_rows.append(row)
-        write_csv(output_path + "/output.csv", output_rows)
+        write_csv(self.output_path + "/output.csv", output_rows)
 
         # --- 2. summary.csv
         print("[INFO] make summary.csv")
@@ -243,7 +283,7 @@ class PrePaperWork:
             ["전문검토 후 최종 포함건수",""],
             ["전문단계 배제건수",""],
             ["비고",""]]
-        write_csv(output_path + "/summary.csv", summary_rows)
+        write_csv(self.output_path + "/summary.csv", summary_rows)
 
 
 class FullPaperWork:

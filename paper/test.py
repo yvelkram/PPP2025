@@ -14,14 +14,17 @@ def main2():
 
 
 def main():
-    ris_filepath = "./ris_input/scopus_export_Nov-13-2025.ris"
+    ris_filepath = ["./ris_input/scopus_export_Nov-13-2025.ris",
+                    "./ris_input/WebofScience_Nov-13-2025.ris",
+                    ""]
     prompt_path = "./prework_prompt_schema.json"
     output_path = "./ris_output"
     quary_questions = "연구 대상이 “도시지역”인가? 연구 주제가 “녹지 형태 또는 구성 변수”인가? 결과변수가 “도시 온열환경 지표(예: 지표온도, 열섬강도, 보행자 열쾌적성)”인가?"
 
-    pw = PrePaperWork(ris_filepath, prompt_path, quary_questions)
-    pw.process()
-    pw.export(output_path)
+    pw = PrePaperWork(ris_filepath, prompt_path, output_path, quary_questions)
+    # pw.process()
+    pw.process_parallel()
+    pw.export()
 
 
 if __name__ == '__main__':

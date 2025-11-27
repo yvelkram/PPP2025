@@ -36,6 +36,7 @@ class PrePaper:
     texts: dict                 # ris data
     accept: bool = False        # accept for screening?
     duplicated: bool = False    # is duplicated?
+    evaluated: bool = False     # screening is done?
     reject_keyword: str = "N/A"
     reject_reason: str = "N/A"
 
